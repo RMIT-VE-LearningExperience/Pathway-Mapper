@@ -228,6 +228,7 @@ function syncCounters(){
   nextE=edges.reduce((m,e)=>Math.max(m,parseInt(e.id.replace(/\D/g,''))||0),0)+1;
 }
 let selNode=null, selEdge=null;
+let selNodes=new Set();
 let linkMode=false, linkFrom=null;
 let lineRouting='curved';
 
@@ -337,7 +338,7 @@ function renderNodes(){
     el.style.background=n.color; el.style.width=(n.w||184)+'px';
     el.innerHTML=`<span class="title">${esc(n.title)}</span>${n.code?`<span class="code">${esc(n.code)}</span>`:''}
       <span class="port l"></span><span class="port r"></span>`;
-    if(selNode===n.id) el.classList.add('sel');
+    if(selNodes.has(n.id)) el.classList.add('sel');
     if(linkFrom===n.id) el.classList.add('link-src');
     board.appendChild(el);
     attachNode(el,n);
@@ -423,10 +424,9 @@ function attachNode(el,n){
   el.addEventListener('mousedown',ev=>{
     if(ev.target.classList.contains('port')) return;
     if(linkMode) return;
-    const p=boardXY(ev);
+    if(ev.shiftKey){selectNode(n.id,true);return;}
     dragNode=n;
     selectNode(n.id);
-    // Re-acquire el after renderNodes rebuilt the DOM
     dragEl=document.querySelector(`.node[data-id="${n.id}"]`);
     const p2=boardXY(ev);
     drag={dx:p2.x-n.x, dy:p2.y-n.y};
@@ -450,12 +450,25 @@ function attachNode(el,n){
 }
 
 // ===== selection / inspector =====
-function selectNode(id){selNode=id;selEdge=null;renderNodes();renderEdges();inspect();}
-function selectEdge(id){selEdge=id;selNode=null;renderNodes();renderEdges();inspect();}
-function clearSel(){selNode=null;selEdge=null;linkFrom=null;renderNodes();renderEdges();inspect();}
+function selectNode(id,additive=false){
+  if(additive){
+    if(selNodes.has(id))selNodes.delete(id);else selNodes.add(id);
+    selNode=selNodes.size===1?[...selNodes][0]:null;
+    selEdge=null;
+  }else{
+    selNodes.clear();selNodes.add(id);selNode=id;selEdge=null;
+  }
+  renderNodes();renderEdges();inspect();
+}
+function selectEdge(id){selEdge=id;selNode=null;selNodes.clear();renderNodes();renderEdges();inspect();}
+function clearSel(){selNode=null;selEdge=null;selNodes.clear();linkFrom=null;renderNodes();renderEdges();inspect();}
 
 function inspect(){
   const box=document.getElementById('inspector');
+  if(selNodes.size>1){
+    box.innerHTML=`<p class="empty">${selNodes.size} boxes selected.</p><p class="empty">Press <span class="kbd">Del</span> to delete all.</p>`;
+    return;
+  }
   if(selNode){
     const n=nodes.find(x=>x.id===selNode);
     box.innerHTML=`
@@ -517,8 +530,12 @@ function setLink(on){linkMode=on;linkFrom=null;document.getElementById('linkBtn'
 document.getElementById('linkBtn').onclick=()=>setLink(!linkMode);
 document.getElementById('delBtn').onclick=del;
 function del(){
-  if(selNode){nodes=nodes.filter(n=>n.id!==selNode);edges=edges.filter(e=>e.from!==selNode&&e.to!==selNode);selNode=null;}
-  else if(selEdge){edges=edges.filter(e=>e.id!==selEdge);selEdge=null;}
+  if(selNodes.size>0){
+    const ids=[...selNodes];
+    nodes=nodes.filter(n=>!ids.includes(n.id));
+    edges=edges.filter(e=>!ids.includes(e.from)&&!ids.includes(e.to));
+    selNodes.clear();selNode=null;
+  }else if(selEdge){edges=edges.filter(e=>e.id!==selEdge);selEdge=null;}
   renderNodes();renderEdges();inspect();
 }
 document.addEventListener('keydown',e=>{if((e.key==='Delete'||e.key==='Backspace')&&(selNode||selEdge)){

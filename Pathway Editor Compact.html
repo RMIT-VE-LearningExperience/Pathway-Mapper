@@ -31,7 +31,7 @@
   .canvas-host{flex:1;overflow:auto;position:relative;background:
     linear-gradient(var(--line) 1px,transparent 1px) 0 0/100% 28px,
     linear-gradient(90deg,var(--line) 1px,transparent 1px) 0 0/28px 100%,var(--bg)}
-  #board{position:relative;width:1800px;height:1500px}
+  #board{position:relative;width:1300px;height:1000px}
   /* ---- column headers ---- */
   .col{position:absolute;top:0;bottom:0;background:var(--col);border-radius:10px;opacity:.55}
   .col-label{position:absolute;top:10px;font-size:12px;font-weight:700;color:#3a4654;width:100%;text-align:center;letter-spacing:.4px}
@@ -228,64 +228,69 @@ function syncCounters(){
   nextE=edges.reduce((m,e)=>Math.max(m,parseInt(e.id.replace(/\D/g,''))||0),0)+1;
 }
 let selNode=null, selEdge=null;
+let selNodes=new Set();
 let linkMode=false, linkFrom=null;
 let lineRouting='curved';
 
 // ===== seed: Creative Industries map =====
 function seed(){
   const def=(id,title,code,col,row,color)=>({id,title,code,col,color,
-    x:COLS.find(c=>c.id===col).x+15, y:60+row*46, w:184});
-  // helper to place by column index ordering — we lay out top-to-bottom per discipline cluster
-  let r;
+    x:COLS.find(c=>c.id===col).x+15, y:50+row*46, w:180});
   nodes=[
-    // ---- Design (green) ----
-    def('n1','Certificate III Clothing & Textile prod.','C3406',3,6,'#e07a52'),
-    def('n2','Certificate IV Design','C4414',4,1,'#3f9c54'),
-    def('n3','Certificate IV Interior Decoration','C4402',4,4,'#3aa0d6'),
-    def('n4','Certificate IV Custom-Made Footwear','C4389',4,6,'#e07a52'),
-    def('n5','Certificate IV Textile Design and Technology','C4434',4,8,'#e07a52'),
-    def('n6','Certificate IV Screen and Media','C4422',4,11,'#3aa0d6'),
-    def('n7','Certificate IV Professional Writing & Editing','C4404',4,18,'#d6202a'),
-    def('n8','Certificate IV Photo & Digit Image','C4415',4,22,'#3f9c54'),
+    // Row layout: 1-row gap between discipline clusters, no large jumps
+    // ---- AQF 3 ----
+    def('n1','Certificate III Clothing & Textile prod.','C3406',3,5,'#e07a52'),
 
+    // ---- AQF 4 ----
+    def('n2','Certificate IV Design','C4414',4,0,'#3f9c54'),
+    def('n3','Certificate IV Interior Decoration','C4402',4,3,'#3aa0d6'),
+    def('n4','Certificate IV Custom-Made Footwear','C4389',4,5,'#e07a52'),
+    def('n5','Certificate IV Textile Design and Technology','C4434',4,6,'#e07a52'),
+    def('n6','Certificate IV Screen and Media','C4422',4,9,'#3aa0d6'),
+    def('n7','Certificate IV Professional Writing & Editing','C4404',4,13,'#d6202a'),
+    def('n8','Certificate IV Photo & Digit Image','C4415',4,15,'#3f9c54'),
+
+    // ---- AQF 5 ----
     def('n10','Diploma Graphic Design','C5409',5,0,'#3f9c54'),
-    def('n11','Diploma Product Design','C5382',5,2,'#4aa1a6'),
-    def('n12','Diploma Interior Design','C5396',5,4,'#3aa0d6'),
-    def('n13','Diploma Fashion Styling','C5401',5,7,'#e07a52'),
-    def('n14','Diploma Screen & Media (Games)','C5413',5,11,'#3aa0d6'),
-    def('n15','Diploma Screen & Media (Content)','C5412',5,13,'#3aa0d6'),
-    def('n16','Diploma Screen & Media','C5421',5,15,'#3aa0d6'),
-    def('n17','Diploma Live Production & Tech services','C5408',5,17,'#f06ba8'),
-    def('n18','Diploma Music Industry','C5410',5,19,'#f06ba8'),
-    def('n19','Diploma Photo & Digit Image','C5411',5,22,'#3f9c54'),
-    def('n20','Diploma Visual Arts','C5414',5,24,'#2e3b8c'),
+    def('n11','Diploma Product Design','C5382',5,1,'#4aa1a6'),
+    def('n12','Diploma Interior Design','C5396',5,3,'#3aa0d6'),
+    def('n13','Diploma Fashion Styling','C5401',5,5,'#e07a52'),
+    def('n14','Diploma Screen & Media (Games)','C5413',5,7,'#3aa0d6'),
+    def('n15','Diploma Screen & Media (Content)','C5412',5,8,'#3aa0d6'),
+    def('n16','Diploma Screen & Media','C5421',5,9,'#3aa0d6'),
+    def('n17','Diploma Live Production & Tech services','C5408',5,11,'#f06ba8'),
+    def('n18','Diploma Music Industry','C5410',5,12,'#f06ba8'),
+    def('n19','Diploma Photo & Digit Image','C5411',5,14,'#3f9c54'),
+    def('n20','Diploma Visual Arts','C5414',5,16,'#2e3b8c'),
 
+    // ---- AQF 6 ----
     def('n30','Associate Degree Graphic Design','AD022',6,0,'#3f9c54'),
-    def('n31','Associate Degree Furniture Design','AD007',6,2,'#4aa1a6'),
-    def('n32','Associate Degree Interior Design','AD020',6,4,'#3aa0d6'),
-    def('n33','Associate Degree in Fashion','AD030',6,7,'#e07a52'),
-    def('n34','Advanced Diploma Screen & Media (Content creation & design)','C6173',6,11,'#3aa0d6'),
-    def('n35','Associate Degree Screen & Media Production','AD017',6,13,'#3aa0d6'),
-    def('n36','Advanced Diploma Music','C6171',6,17,'#f06ba8'),
-    def('n37','Advanced Diploma Professional Screen Writing','C6180',6,19,'#d6202a'),
-    def('n38','Associate Degree Professional Writing & Editing','AD016',6,21,'#d6202a'),
-    def('n39','Advanced Diploma Visual Art','C6174',6,24,'#2e3b8c'),
+    def('n31','Associate Degree Furniture Design','AD007',6,1,'#4aa1a6'),
+    def('n32','Associate Degree Interior Design','AD020',6,3,'#3aa0d6'),
+    def('n33','Associate Degree in Fashion','AD030',6,5,'#e07a52'),
+    def('n34','Advanced Diploma Screen & Media (Content creation & design)','C6173',6,7,'#3aa0d6'),
+    def('n35','Associate Degree Screen & Media Production','AD017',6,8,'#3aa0d6'),
+    def('n36','Advanced Diploma Music','C6171',6,11,'#f06ba8'),
+    def('n37','Advanced Diploma Professional Screen Writing','C6180',6,13,'#d6202a'),
+    def('n38','Associate Degree Professional Writing & Editing','AD016',6,14,'#d6202a'),
+    def('n39','Advanced Diploma Visual Art','C6174',6,16,'#2e3b8c'),
 
+    // ---- AQF 7 ----
     def('n50','Bachelor Design (Communication Design)','BP115',7,0,'#3f9c54'),
-    def('n51','Bachelor Design (Industrial Design)','BH104P15',7,2,'#4aa1a6'),
-    def('n52','Bachelor Design (Interior Design)','BH115',7,4,'#3aa0d6'),
-    def('n53','Bachelor Fashion (Design)','BP328',7,6,'#e07a52'),
-    def('n54','Bachelor Fashion (Enterprise)','BP327',7,7,'#e07a52'),
-    def('n55','Bachelor Fashion & Textiles Sustainable innovation','BP326',7,8,'#e07a52'),
-    def('n56','Bachelor Textiles (Design)','BP121',7,9,'#e07a52'),
-    def('n57','Bachelor Design (Digital Media)','BP309',7,11,'#3aa0d6'),
-    def('n58','Bachelor Design (Games)','BP214P12',7,13,'#3aa0d6'),
-    def('n59','Bachelor Arts (Music Industry)','BP047',7,16,'#f06ba8'),
-    def('n60','Bachelor Comms (Media)','BP221',7,18,'#d6202a'),
-    def('n61','Bachelor Arts (Creative Writing)','BP257',7,19,'#d6202a'),
-    def('n62','Bachelor Comms (Journalism)','BP220',7,21,'#d6202a'),
-    def('n63','Bachelor Arts (Photography)','BP117',7,22,'#3f9c54'),
-    def('n64','Bachelor Arts (Fine Art)','BP201P16',7,24,'#2e3b8c'),
+    def('n51','Bachelor Design (Industrial Design)','BH104P15',7,1,'#4aa1a6'),
+    def('n52','Bachelor Design (Interior Design)','BH115',7,3,'#3aa0d6'),
+    def('n53','Bachelor Fashion (Design)','BP328',7,5,'#e07a52'),
+    def('n54','Bachelor Fashion (Enterprise)','BP327',7,6,'#e07a52'),
+    def('n55','Bachelor Fashion & Textiles Sustainable innovation','BP326',7,7,'#e07a52'),
+    def('n56','Bachelor Textiles (Design)','BP121',7,8,'#e07a52'),
+    def('n57','Bachelor Design (Digital Media)','BP309',7,9,'#3aa0d6'),
+    def('n58','Bachelor Design (Games)','BP214P12',7,10,'#3aa0d6'),
+    def('n59','Bachelor Arts (Music Industry)','BP047',7,11,'#f06ba8'),
+    def('n60','Bachelor Comms (Media)','BP221',7,13,'#d6202a'),
+    def('n61','Bachelor Arts (Creative Writing)','BP257',7,14,'#d6202a'),
+    def('n62','Bachelor Comms (Journalism)','BP220',7,15,'#d6202a'),
+    def('n63','Bachelor Arts (Photography)','BP117',7,16,'#3f9c54'),
+    def('n64','Bachelor Arts (Fine Art)','BP201P16',7,17,'#2e3b8c'),
   ];
   syncCounters();
   // ---- edges (representative connections from the diagram) ----
@@ -337,7 +342,7 @@ function renderNodes(){
     el.style.background=n.color; el.style.width=(n.w||184)+'px';
     el.innerHTML=`<span class="title">${esc(n.title)}</span>${n.code?`<span class="code">${esc(n.code)}</span>`:''}
       <span class="port l"></span><span class="port r"></span>`;
-    if(selNode===n.id) el.classList.add('sel');
+    if(selNodes.has(n.id)) el.classList.add('sel');
     if(linkFrom===n.id) el.classList.add('link-src');
     board.appendChild(el);
     attachNode(el,n);
@@ -423,10 +428,9 @@ function attachNode(el,n){
   el.addEventListener('mousedown',ev=>{
     if(ev.target.classList.contains('port')) return;
     if(linkMode) return;
-    const p=boardXY(ev);
+    if(ev.shiftKey){selectNode(n.id,true);return;}
     dragNode=n;
     selectNode(n.id);
-    // Re-acquire el after renderNodes rebuilt the DOM
     dragEl=document.querySelector(`.node[data-id="${n.id}"]`);
     const p2=boardXY(ev);
     drag={dx:p2.x-n.x, dy:p2.y-n.y};
@@ -450,12 +454,25 @@ function attachNode(el,n){
 }
 
 // ===== selection / inspector =====
-function selectNode(id){selNode=id;selEdge=null;renderNodes();renderEdges();inspect();}
-function selectEdge(id){selEdge=id;selNode=null;renderNodes();renderEdges();inspect();}
-function clearSel(){selNode=null;selEdge=null;linkFrom=null;renderNodes();renderEdges();inspect();}
+function selectNode(id,additive=false){
+  if(additive){
+    if(selNodes.has(id))selNodes.delete(id);else selNodes.add(id);
+    selNode=selNodes.size===1?[...selNodes][0]:null;
+    selEdge=null;
+  }else{
+    selNodes.clear();selNodes.add(id);selNode=id;selEdge=null;
+  }
+  renderNodes();renderEdges();inspect();
+}
+function selectEdge(id){selEdge=id;selNode=null;selNodes.clear();renderNodes();renderEdges();inspect();}
+function clearSel(){selNode=null;selEdge=null;selNodes.clear();linkFrom=null;renderNodes();renderEdges();inspect();}
 
 function inspect(){
   const box=document.getElementById('inspector');
+  if(selNodes.size>1){
+    box.innerHTML=`<p class="empty">${selNodes.size} boxes selected.</p><p class="empty">Press <span class="kbd">Del</span> to delete all.</p>`;
+    return;
+  }
   if(selNode){
     const n=nodes.find(x=>x.id===selNode);
     box.innerHTML=`
@@ -517,8 +534,12 @@ function setLink(on){linkMode=on;linkFrom=null;document.getElementById('linkBtn'
 document.getElementById('linkBtn').onclick=()=>setLink(!linkMode);
 document.getElementById('delBtn').onclick=del;
 function del(){
-  if(selNode){nodes=nodes.filter(n=>n.id!==selNode);edges=edges.filter(e=>e.from!==selNode&&e.to!==selNode);selNode=null;}
-  else if(selEdge){edges=edges.filter(e=>e.id!==selEdge);selEdge=null;}
+  if(selNodes.size>0){
+    const ids=[...selNodes];
+    nodes=nodes.filter(n=>!ids.includes(n.id));
+    edges=edges.filter(e=>!ids.includes(e.from)&&!ids.includes(e.to));
+    selNodes.clear();selNode=null;
+  }else if(selEdge){edges=edges.filter(e=>e.id!==selEdge);selEdge=null;}
   renderNodes();renderEdges();inspect();
 }
 document.addEventListener('keydown',e=>{if((e.key==='Delete'||e.key==='Backspace')&&(selNode||selEdge)){
@@ -938,7 +959,7 @@ function rebuildCols(){
 }
 
 // ===== boot =====
-seed();renderCols();renderNodes();renderEdges();renderLegend();inspect();renderColEditor();
+seed();rebuildCols();renderNodes();renderEdges();renderLegend();inspect();renderColEditor();
 </script>
 
 <!-- ===== ONBOARDING TOUR ===== -->
