@@ -1,0 +1,9 @@
+name = "pathway-editor-views"
+main = "src/index.js"
+compatibility_date = "2026-06-03"
+account_id = "8d71143d36ca55bc821e996a01816665"
+workers_dev = true
+
+[[kv_namespaces]]
+binding = "PATHWAY_VIEWS"
+id = "e718d2c470d34a8ab4a36320bea658d3"

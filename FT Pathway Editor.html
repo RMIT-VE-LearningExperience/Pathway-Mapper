@@ -31,7 +31,7 @@
   .canvas-host{flex:1;overflow:auto;position:relative;background:
     linear-gradient(var(--line) 1px,transparent 1px) 0 0/100% 28px,
     linear-gradient(90deg,var(--line) 1px,transparent 1px) 0 0/28px 100%,var(--bg)}
-  #board{position:relative;width:1000px;height:1000px}
+  #board{position:relative;width:1000px;height:1650px}
   /* ---- column headers ---- */
   .col{position:absolute;top:0;bottom:0;background:var(--col);border-radius:10px;opacity:.55}
   .col-label{position:absolute;top:10px;font-size:12px;font-weight:700;color:#3a4654;width:100%;text-align:center;letter-spacing:.4px}
@@ -83,6 +83,21 @@
   button.small-add{font:inherit;font-size:11.5px;font-weight:600;border:1px solid var(--line);background:#fff;
     color:var(--ink);padding:6px 10px;border-radius:7px;cursor:pointer;width:100%;margin-top:6px}
   button.small-add:hover{border-color:var(--accent);color:var(--accent)}
+  /* ---- map switcher ---- */
+  .map-sw{position:relative;display:inline-block}
+  .map-sw-btn{font:inherit;font-size:12px;font-weight:600;border:1px solid var(--line);
+    background:#fff;color:var(--ink);padding:5px 10px;border-radius:8px;cursor:pointer;
+    transition:.15s;white-space:nowrap}
+  .map-sw-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .map-sw-menu{position:absolute;top:calc(100% + 6px);left:0;background:#fff;
+    border:1px solid var(--line);border-radius:10px;
+    box-shadow:0 4px 16px rgba(20,30,45,.13);min-width:190px;z-index:200;
+    display:none;flex-direction:column;padding:4px}
+  .map-sw.open .map-sw-menu{display:flex}
+  .map-sw-item{font:inherit;font-size:12.5px;font-weight:600;padding:8px 14px;
+    border-radius:7px;text-decoration:none;color:var(--ink);display:block;cursor:pointer}
+  .map-sw-item:hover{background:#f4f6f9;color:var(--accent)}
+  .map-sw-item.current{color:var(--accent);background:#fef5f3;cursor:default}
   /* ---- export dropdown ---- */
   .exp-group{position:relative;display:inline-block}
   .exp-menu{position:absolute;top:calc(100% + 6px);right:0;background:#fff;
@@ -94,6 +109,7 @@
     color:var(--ink);padding:8px 14px;text-align:left;cursor:pointer;border-radius:7px;width:100%}
   .exp-menu button:hover{background:#f4f6f9;color:var(--accent)}
   .exp-menu hr{border:none;border-top:1px solid var(--line);margin:3px 8px}
+  .views-menu{min-width:170px}
 </style>
 </head>
 <body>
@@ -110,6 +126,13 @@
   <div class="spacer"></div>
   <button class="tool" id="addBtn">＋ Add box</button>
   <button class="tool danger" id="delBtn">✕ Delete</button>
+  <div class="exp-group" id="viewsGroup">
+    <button class="tool" id="viewsBtn">☁ Views ▾</button>
+    <div class="exp-menu views-menu">
+      <button id="saveViewBtn">☁ Save view</button>
+      <button id="loadViewBtn">↻ Load view</button>
+    </div>
+  </div>
   <div class="exp-group" id="expGroup">
     <button class="tool" id="expBtn">⤓ Export ▾</button>
     <div class="exp-menu">
@@ -255,7 +278,7 @@ let lineRouting='curved';
 // ===== seed: Future Technologies map =====
 function seed(){
   const def=(id,title,code,col,row,color)=>({id,title,code,col,color,
-    x:COLS.find(c=>c.id===col).x+15, y:50+row*46, w:182});
+    x:COLS.find(c=>c.id===col).x+15, y:50+row*88, w:182});
   const E=(a,b,style,color)=>({id:'e'+(nextE++),from:a,to:b,style,color});
 
   nodes=[
@@ -581,8 +604,16 @@ document.getElementById('delBtn').onclick=del;
 // Export dropdown
 document.getElementById('mapSwBtn').onclick=e=>{e.stopPropagation();document.getElementById('mapSw').classList.toggle('open');};
 document.getElementById('expBtn').onclick=e=>{e.stopPropagation();document.getElementById('expGroup').classList.toggle('open');};
-document.addEventListener('click',()=>{document.getElementById('expGroup').classList.remove('open');document.getElementById('mapSw').classList.remove('open');});
-document.querySelectorAll('.exp-menu button').forEach(b=>b.addEventListener('click',()=>document.getElementById('expGroup').classList.remove('open')));
+document.getElementById('viewsBtn').onclick=e=>{e.stopPropagation();document.getElementById('viewsGroup').classList.toggle('open');};
+document.addEventListener('click',()=>{
+  document.getElementById('expGroup').classList.remove('open');
+  document.getElementById('viewsGroup').classList.remove('open');
+  document.getElementById('mapSw').classList.remove('open');
+});
+document.querySelectorAll('#expGroup .exp-menu button,#viewsGroup .exp-menu button').forEach(b=>b.addEventListener('click',()=>{
+  document.getElementById('expGroup').classList.remove('open');
+  document.getElementById('viewsGroup').classList.remove('open');
+}));
 function del(){
   if(selNodes.size>0){
     const ids=[...selNodes];
@@ -612,6 +643,51 @@ document.getElementById('fileIn').onchange=e=>{
     syncCounters();clearSel();renderNodes();renderEdges();
   }catch(err){alert('Invalid JSON');}};r.readAsText(f);
 };
+
+// ===== cloud saved views =====
+const VIEW_API='https://pathway-editor-views.lawrence-makoona.workers.dev';
+const EDITOR_ID='ft';
+function currentViewData(){return{cols:COLS,styles:STYLES,nodes,edges};}
+function applyViewData(d){
+  if(!d||!Array.isArray(d.cols)||!Array.isArray(d.nodes)||!Array.isArray(d.edges))throw new Error('Invalid view data');
+  COLS.splice(0,COLS.length,...d.cols);
+  Object.keys(STYLES).forEach(k=>delete STYLES[k]);
+  Object.assign(STYLES,d.styles||{});
+  nodes=d.nodes||[];edges=d.edges||[];
+  syncCounters();clearSel();rebuildCols();renderNodes();renderEdges();renderLegend();inspect();renderColEditor();
+}
+function currentViewName(){return(document.querySelector('header h1')?.textContent||'Future Technologies view').trim();}
+async function saveCloudView(){
+  const name=prompt('Save this pathway view as:',currentViewName());
+  if(!name)return;
+  const body={editor:EDITOR_ID,name,title:currentViewName(),
+    badge:(document.querySelector('header .badge')?.textContent||'').trim(),data:currentViewData()};
+  const res=await fetch(`${VIEW_API}/views`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+  const saved=await res.json();
+  if(!res.ok)throw new Error(saved.error||'Save failed');
+  localStorage.setItem(`pathway-view-token:${saved.id}`,saved.editToken);
+  alert(`Saved "${saved.name}".\nView ID: ${saved.id}`);
+}
+async function loadCloudView(){
+  const res=await fetch(`${VIEW_API}/views?editor=${encodeURIComponent(EDITOR_ID)}`);
+  const list=await res.json();
+  if(!res.ok)throw new Error(list.error||'Could not load views');
+  if(!list.views.length){alert('No saved views yet.');return;}
+  const options=list.views.map((v,i)=>`${i+1}. ${v.name} (${v.id})`).join('\n');
+  const pick=prompt(`Choose a view number or paste a view ID:\n\n${options}`,'1');
+  if(!pick)return;
+  const chosen=list.views[Number(pick)-1]||list.views.find(v=>v.id===pick.trim());
+  const id=chosen?chosen.id:pick.trim();
+  const viewRes=await fetch(`${VIEW_API}/views/${encodeURIComponent(id)}`);
+  const view=await viewRes.json();
+  if(!viewRes.ok)throw new Error(view.error||'Could not load view');
+  if(view.title)document.querySelector('header h1').textContent=view.title;
+  if(view.badge)document.querySelector('header .badge').textContent=view.badge;
+  applyViewData(view.data);
+}
+document.getElementById('saveViewBtn').onclick=()=>saveCloudView().catch(err=>alert(err.message));
+document.getElementById('loadViewBtn').onclick=()=>loadCloudView().catch(err=>alert(err.message));
+
 document.getElementById('expHtml').onclick=exportHTML;
 function exportHTML(){
   // static, view-only standalone HTML snapshot
