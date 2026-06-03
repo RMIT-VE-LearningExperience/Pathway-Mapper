@@ -80,6 +80,11 @@
   .col-edit button{font:inherit;font-size:11px;border:1px solid var(--line);background:#fff;color:var(--muted);
     padding:4px 7px;border-radius:6px;cursor:pointer;flex-shrink:0}
   .col-edit button:hover{border-color:#c0392b;color:#c0392b}
+  .nudge-grid{display:grid;grid-template-columns:repeat(3,32px);gap:6px;margin-top:6px}
+  .nudge-grid button{font:inherit;font-size:13px;border:1px solid var(--line);background:#fff;color:var(--ink);
+    width:32px;height:30px;border-radius:6px;cursor:pointer}
+  .nudge-grid button:hover{border-color:var(--accent);color:var(--accent)}
+  .nudge-grid .blank{visibility:hidden}
   button.small-add{font:inherit;font-size:11.5px;font-weight:600;border:1px solid var(--line);background:#fff;
     color:var(--ink);padding:6px 10px;border-radius:7px;cursor:pointer;width:100%;margin-top:6px}
   button.small-add:hover{border-color:var(--accent);color:var(--accent)}
@@ -397,6 +402,18 @@ function renderNodes(){
 
 // ===== edges =====
 function nodeRect(n){return{x:n.x,y:n.y,w:(n.w||184),h:document.querySelector(`.node[data-id="${n.id}"]`)?.offsetHeight||54};}
+function straightPath(x1,y1,x2,y2,e={}){
+  const bx=(x1+x2)/2+(e.bendX||0);
+  const hasY=typeof e.bendY==='number'&&e.bendY!==0;
+  const by=hasY?(y1+y2)/2+e.bendY:y2;
+  return `M ${x1} ${y1} L ${bx} ${y1} L ${bx} ${by} L ${x2} ${by} L ${x2} ${y2}`;
+}
+function drawStraightRoute(ctx,x1,y1,x2,y2,e={}){
+  const bx=(x1+x2)/2+(e.bendX||0);
+  const hasY=typeof e.bendY==='number'&&e.bendY!==0;
+  const by=hasY?(y1+y2)/2+e.bendY:y2;
+  ctx.lineTo(bx,y1);ctx.lineTo(bx,by);ctx.lineTo(x2,by);ctx.lineTo(x2,y2);
+}
 function renderEdges(){
   svg.innerHTML='';
   edges.forEach(e=>{
@@ -406,7 +423,7 @@ function renderEdges(){
     const x1=ra.x+ra.w, y1=ra.y+ra.h/2, x2=rb.x, y2=rb.y+rb.h/2;
     const mx=(x1+x2)/2;
     const d=lineRouting==='straight'
-      ?`M ${x1} ${y1} L ${mx} ${y1} L ${mx} ${y2} L ${x2} ${y2}`
+      ?straightPath(x1,y1,x2,y2,e)
       :`M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
     const p=document.createElementNS(SVGNS,'path');
     const st=STYLES[e.style]||STYLES.guar;
@@ -471,7 +488,7 @@ host.addEventListener('mousemove',ev=>{
   const x2=p.x, y2=p.y;
   const mx=(x1+x2)/2;
   const d=lineRouting==='straight'
-    ?`M ${x1} ${y1} L ${mx} ${y1} L ${mx} ${y2} L ${x2} ${y2}`
+    ?straightPath(x1,y1,x2,y2)
     :`M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
   ghostLine.setAttribute('d',d);
   if(!ghostLine.parentNode) svg.appendChild(ghostLine);
@@ -562,9 +579,21 @@ function inspect(){
       <label class="fld">Connection type</label>
       <select id="e-style">${Object.entries(STYLES).map(([k,v])=>`<option value="${k}" ${k===e.style?'selected':''}>${v.label}</option>`).join('')}</select>
       <label class="fld">Colour</label>
-      <div class="swatch-row">${PALETTE.map(c=>`<div class="sw ${c===e.color?'on':''}" data-c="${c}" style="background:${c}"></div>`).join('')}</div>`;
+      <div class="swatch-row">${PALETTE.map(c=>`<div class="sw ${c===e.color?'on':''}" data-c="${c}" style="background:${c}"></div>`).join('')}</div>
+      <label class="fld">Straight line position</label>
+      <div class="hint">Set Line routing to Straight, then use arrows or these buttons to move the bend.</div>
+      <div class="nudge-grid">
+        <span class="blank"></span><button data-dx="0" data-dy="-14">↑</button><span class="blank"></span>
+        <button data-dx="-14" data-dy="0">←</button><button data-reset="1">↺</button><button data-dx="14" data-dy="0">→</button>
+        <span class="blank"></span><button data-dx="0" data-dy="14">↓</button><span class="blank"></span>
+      </div>`;
     document.getElementById('e-style').onchange=ev=>{e.style=ev.target.value;renderEdges();};
     box.querySelectorAll('.sw').forEach(s=>s.onclick=()=>{e.color=s.dataset.c;renderEdges();inspect();});
+    box.querySelectorAll('.nudge-grid button').forEach(btn=>btn.onclick=()=>{
+      if(btn.dataset.reset){delete e.bendX;delete e.bendY;}
+      else nudgeEdge(e,+btn.dataset.dx,+btn.dataset.dy);
+      renderEdges();
+    });
   }else{
     box.innerHTML='<p class="empty">Select a box or a connection to edit it.</p>';
   }
@@ -623,8 +652,21 @@ function del(){
 }
 document.addEventListener('keydown',e=>{if((e.key==='Delete'||e.key==='Backspace')&&(selNode||selEdge)){
   if(document.activeElement.tagName==='INPUT'||document.activeElement.tagName==='TEXTAREA')return;del();}
+  if(selEdge&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){
+    if(document.activeElement.tagName==='INPUT'||document.activeElement.tagName==='TEXTAREA')return;
+    e.preventDefault();
+    const step=e.shiftKey?28:14;
+    const edge=edges.find(x=>x.id===selEdge);
+    const dx=e.key==='ArrowLeft'?-step:e.key==='ArrowRight'?step:0;
+    const dy=e.key==='ArrowUp'?-step:e.key==='ArrowDown'?step:0;
+    if(edge){nudgeEdge(edge,dx,dy);renderEdges();}
+  }
   if(e.key==='Escape')clearSel();});
 host.addEventListener('click',()=>clearSel());
+function nudgeEdge(edge,dx,dy){
+  edge.bendX=(edge.bendX||0)+dx;
+  edge.bendY=(edge.bendY||0)+dy;
+}
 
 // ===== export / import =====
 function download(name,content,type){
@@ -632,12 +674,13 @@ function download(name,content,type){
   const a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u);
 }
 document.getElementById('expJson').onclick=()=>{
-  download('ci_pathways.json',JSON.stringify({cols:COLS,styles:STYLES,nodes,edges},null,2),'application/json');
+  download('ci_pathways.json',JSON.stringify({cols:COLS,styles:STYLES,nodes,edges,lineRouting},null,2),'application/json');
 };
 document.getElementById('impBtn').onclick=()=>document.getElementById('fileIn').click();
 document.getElementById('fileIn').onchange=e=>{
   const f=e.target.files[0];if(!f)return;const r=new FileReader();
   r.onload=()=>{try{const d=JSON.parse(r.result);nodes=d.nodes||[];edges=d.edges||[];
+    if(d.lineRouting){lineRouting=d.lineRouting;document.getElementById('lineRouting').value=lineRouting;}
     syncCounters();clearSel();renderNodes();renderEdges();
   }catch(err){alert('Invalid JSON');}};r.readAsText(f);
 };
@@ -645,13 +688,14 @@ document.getElementById('fileIn').onchange=e=>{
 // ===== cloud saved views =====
 const VIEW_API='https://pathway-editor-views.lawrence-makoona.workers.dev';
 const EDITOR_ID='ci-compact';
-function currentViewData(){return{cols:COLS,styles:STYLES,nodes,edges};}
+function currentViewData(){return{cols:COLS,styles:STYLES,nodes,edges,lineRouting};}
 function applyViewData(d){
   if(!d||!Array.isArray(d.cols)||!Array.isArray(d.nodes)||!Array.isArray(d.edges))throw new Error('Invalid view data');
   COLS.splice(0,COLS.length,...d.cols);
   Object.keys(STYLES).forEach(k=>delete STYLES[k]);
   Object.assign(STYLES,d.styles||{});
   nodes=d.nodes||[];edges=d.edges||[];
+  if(d.lineRouting){lineRouting=d.lineRouting;document.getElementById('lineRouting').value=lineRouting;}
   syncCounters();clearSel();rebuildCols();renderNodes();renderEdges();renderLegend();inspect();renderColEditor();
 }
 function currentViewName(){return(document.querySelector('header h1')?.textContent||'Creative Industries view').trim();}
@@ -694,7 +738,7 @@ function exportHTML(){
   edges.forEach(e=>{const a=nodes.find(n=>n.id===e.from),b=nodes.find(n=>n.id===e.to);if(!a||!b)return;
     const ra=nodeRect(a),rb=nodeRect(b);const x1=ra.x+ra.w,y1=ra.y+ra.h/2,x2=rb.x,y2=rb.y+rb.h/2,mx=(x1+x2)/2;
     const st=STYLES[e.style]||STYLES.guar;const dash=st.dash==='none'?'':`stroke-dasharray="${st.dash}"`;
-    const pathD=lineRouting==='straight'?`M ${x1} ${y1} L ${mx} ${y1} L ${mx} ${y2} L ${x2} ${y2}`:`M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
+    const pathD=lineRouting==='straight'?straightPath(x1,y1,x2,y2,e):`M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
     svgEdges+=`<path d="${pathD}" fill="none" stroke="${e.color}" stroke-width="${st.w}" stroke-linecap="${st.cap}" ${dash}/>`;});
   let cols='',nodeHtml='';
   COLS.forEach(c=>{cols+=`<div style="position:absolute;left:${c.x}px;top:0;width:${c.w}px;height:100%;background:#e9eef4;opacity:.5;border-radius:10px"></div>
@@ -784,7 +828,7 @@ function buildMapCanvas(){
     if(st.dash!=='none') ctx.setLineDash(st.dash.split(' ').map(Number));
     else ctx.setLineDash([]);
     ctx.moveTo(x1,y1);
-    if(lineRouting==='straight'){ctx.lineTo(mx,y1);ctx.lineTo(mx,y2);ctx.lineTo(x2,y2);}
+    if(lineRouting==='straight'){drawStraightRoute(ctx,x1,y1,x2,y2,e);}
     else ctx.bezierCurveTo(mx,y1,mx,y2,x2,y2);
     ctx.stroke();
   });
@@ -924,7 +968,7 @@ function buildSlideCanvas(){
     if(st.dash!=='none')ctx.setLineDash(st.dash.split(' ').map(Number));
     else ctx.setLineDash([]);
     ctx.moveTo(x1,y1);
-    if(lineRouting==='straight'){ctx.lineTo(mx,y1);ctx.lineTo(mx,y2);ctx.lineTo(x2,y2);}
+    if(lineRouting==='straight'){drawStraightRoute(ctx,x1,y1,x2,y2,e);}
     else ctx.bezierCurveTo(mx,y1,mx,y2,x2,y2);
     ctx.stroke();
   });
