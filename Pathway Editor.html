@@ -67,8 +67,11 @@
   .sw.on{border-color:#111}
   .hint{font-size:11px;color:var(--muted);line-height:1.5;background:#f7f9fb;border:1px solid var(--line);
     border-radius:8px;padding:9px 11px}
-  .legend-item{display:flex;align-items:center;gap:8px;font-size:11.5px;margin:7px 0;cursor:pointer;color:var(--ink)}
+  .legend-item{display:flex;align-items:center;gap:8px;font-size:11.5px;margin:7px 0;color:var(--ink)}
   .legend-item.on{font-weight:700}
+  .legend-label{border-radius:4px;padding:1px 3px;outline:none;cursor:text}
+  .legend-label:hover{background:#f0f3f7}
+  .legend-label:focus{background:#e8f0fe;box-shadow:0 0 0 2px #a8c4ff}
   .legend-swatch{width:40px;height:0;flex-shrink:0}
   .empty{color:var(--muted);font-size:12px;font-style:italic}
   .kbd{font-family:monospace;background:#eef1f5;border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:11px}
@@ -486,11 +489,20 @@ function renderLegend(){
   const L=document.getElementById('legend');
   L.innerHTML=Object.entries(STYLES).map(([k,v])=>{
     const dash=v.dash==='none'?'':`stroke-dasharray="${v.dash}"`;
-    return `<div class="legend-item">
+    return `<div class="legend-item" data-style="${k}">
       <svg class="legend-swatch" height="14" viewBox="0 0 40 14">
         <line x1="0" y1="7" x2="40" y2="7" stroke="#333" stroke-width="${v.w}" stroke-linecap="${v.cap}" ${dash}/>
-      </svg><span>${v.label}</span></div>`;
+      </svg><span class="legend-label" contenteditable="true" title="Click to edit">${v.label}</span></div>`;
   }).join('');
+  L.querySelectorAll('.legend-label').forEach(span=>{
+    const key=span.closest('[data-style]').dataset.style;
+    span.addEventListener('input',()=>{
+      STYLES[key].label=span.textContent.trim()||STYLES[key].label;
+      const opt=document.querySelector(`#e-style option[value="${key}"]`);
+      if(opt) opt.textContent=STYLES[key].label;
+    });
+    span.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();span.blur();}});
+  });
 }
 
 // ===== toolbar actions =====
