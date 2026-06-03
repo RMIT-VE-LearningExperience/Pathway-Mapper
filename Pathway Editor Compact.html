@@ -101,8 +101,10 @@
   .map-sw.open .map-sw-menu{display:flex}
   .map-sw-item{font:inherit;font-size:12.5px;font-weight:600;padding:8px 14px;
     border-radius:7px;text-decoration:none;color:var(--ink);display:block;cursor:pointer}
+  button.map-sw-item{border:none;background:none;text-align:left;width:100%}
   .map-sw-item:hover{background:#f4f6f9;color:var(--accent)}
   .map-sw-item.current{color:var(--accent);background:#fef5f3;cursor:default}
+  .map-sw-sep{border:none;border-top:1px solid var(--line);margin:4px 8px}
   /* ---- export dropdown ---- */
   .exp-group{position:relative;display:inline-block}
   .exp-menu{position:absolute;top:calc(100% + 6px);right:0;background:#fff;
@@ -139,6 +141,8 @@
     <div class="map-sw-menu">
       <span class="map-sw-item current">Creative Industries</span>
       <a class="map-sw-item" href="FT%20Pathway%20Editor.html">Future Technologies</a>
+      <hr class="map-sw-sep">
+      <button class="map-sw-item" id="createNewMapBtn">Create new</button>
     </div>
   </div>
   <div class="spacer"></div>
@@ -643,6 +647,7 @@ function setLink(on){linkMode=on;linkFrom=null;host.style.cursor=on?'crosshair':
 document.getElementById('delBtn').onclick=del;
 // Export dropdown
 document.getElementById('mapSwBtn').onclick=e=>{e.stopPropagation();document.getElementById('mapSw').classList.toggle('open');};
+document.getElementById('createNewMapBtn').onclick=e=>{e.stopPropagation();createNewMap();document.getElementById('mapSw').classList.remove('open');};
 document.getElementById('expBtn').onclick=e=>{e.stopPropagation();document.getElementById('expGroup').classList.toggle('open');};
 document.getElementById('viewsBtn').onclick=e=>{e.stopPropagation();document.getElementById('viewsGroup').classList.toggle('open');};
 document.addEventListener('click',()=>{
@@ -661,6 +666,16 @@ function del(){
     edges=edges.filter(e=>!ids.includes(e.from)&&!ids.includes(e.to));
     selNodes.clear();selNode=null;
   }else if(selEdge){edges=edges.filter(e=>e.id!==selEdge);selEdge=null;}
+  renderNodes();renderEdges();inspect();
+}
+function createNewMap(){
+  if(!confirm('Create a new blank map? Unsaved changes on this canvas will be cleared.'))return;
+  const title=prompt('Map title:','Creative Industries — New Pathway Map');
+  if(title===null)return;
+  document.querySelector('header h1').textContent=title.trim()||'Creative Industries — New Pathway Map';
+  nodes=[];edges=[];nextN=1;nextE=1;selNode=null;selEdge=null;selNodes.clear();linkFrom=null;
+  lineRouting='straight';document.getElementById('lineRouting').value=lineRouting;
+  host.scrollTo({left:0,top:0});
   renderNodes();renderEdges();inspect();
 }
 document.addEventListener('keydown',e=>{if((e.key==='Delete'||e.key==='Backspace')&&(selNode||selEdge)){
