@@ -3,6 +3,9 @@
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Future Technologies Pathways — Editor</title>
 <style>
   :root{
@@ -640,6 +643,14 @@ function renderLegend(){
 }
 
 // ===== toolbar actions =====
+document.querySelectorAll('a.map-sw-item').forEach(a=>{
+  a.addEventListener('click',e=>{
+    e.preventDefault();
+    const url=new URL(a.getAttribute('href'),window.location.href);
+    url.searchParams.set('v',Date.now());
+    window.location.href=url.href;
+  });
+});
 document.getElementById('addBtn').onclick=()=>{
   const n={id:'n'+(nextN++),title:'New qualification',code:'',col:6,
     x:COLS[2].x+15,y:host.scrollTop+120,w:182,color:PALETTE[0]};
