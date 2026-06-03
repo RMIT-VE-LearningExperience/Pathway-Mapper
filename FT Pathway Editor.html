@@ -88,6 +88,7 @@
   .col-edit input{font:inherit;font-size:12px;padding:5px 7px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
   .col-edit input.col-label-input{flex:1;min-width:0}
   .col-edit input.col-width-input{width:64px;flex-shrink:0}
+  .col-edit input.col-color-input{width:32px;height:30px;padding:2px;flex-shrink:0;cursor:pointer}
   .col-edit button{font:inherit;font-size:11px;border:1px solid var(--line);background:#fff;color:var(--muted);
     padding:4px 7px;border-radius:6px;cursor:pointer;flex-shrink:0}
   .col-edit button:hover{border-color:#c0392b;color:#c0392b}
@@ -302,11 +303,12 @@ const host=document.getElementById('host');
 
 // ---- AQF columns ----
 const COL_WIDTH=230;
+const DEFAULT_COL_COLOR='#e9eef4';
 const COLS=[
-  {id:4,label:"AQF Level 4",x:20,w:COL_WIDTH},
-  {id:5,label:"AQF Level 5",x:270,w:COL_WIDTH},
-  {id:6,label:"AQF Level 6",x:520,w:COL_WIDTH},
-  {id:7,label:"AQF Level 7",x:770,w:COL_WIDTH},
+  {id:4,label:"AQF Level 4",x:20,w:COL_WIDTH,color:DEFAULT_COL_COLOR},
+  {id:5,label:"AQF Level 5",x:270,w:COL_WIDTH,color:DEFAULT_COL_COLOR},
+  {id:6,label:"AQF Level 6",x:520,w:COL_WIDTH,color:DEFAULT_COL_COLOR},
+  {id:7,label:"AQF Level 7",x:770,w:COL_WIDTH,color:DEFAULT_COL_COLOR},
 ];
 
 const STYLES={
@@ -328,6 +330,16 @@ let selNode=null, selEdge=null;
 let selNodes=new Set();
 let linkMode=false, linkFrom=null;
 let lineRouting='straight';
+
+function normaliseHexColor(value,fallback=DEFAULT_COL_COLOR){
+  const raw=String(value||'').trim();
+  return /^#[0-9a-f]{6}$/i.test(raw)?raw:fallback;
+}
+function columnColor(c){return normaliseHexColor(c?.color);}
+function hexToRgba(hex,alpha){
+  const rgb=hexToRgb(normaliseHexColor(hex));
+  return `rgba(${rgb.r},${rgb.g},${rgb.b},${alpha})`;
+}
 
 // ===== seed: Future Technologies map =====
 function seed(){
@@ -426,7 +438,7 @@ function seed(){
 function renderCols(){
   COLS.forEach(c=>{
     const d=document.createElement('div');
-    d.className='col'; d.style.left=c.x+'px'; d.style.width=c.w+'px';
+    d.className='col'; d.style.left=c.x+'px'; d.style.width=c.w+'px'; d.style.background=columnColor(c);
     board.insertBefore(d,svg);
     const l=document.createElement('div');
     l.className='col-label'; l.style.left=c.x+'px'; l.style.width=c.w+'px'; l.textContent=c.label;
@@ -784,9 +796,11 @@ document.getElementById('expJson').onclick=()=>{
 document.getElementById('impBtn').onclick=()=>document.getElementById('fileIn').click();
 document.getElementById('fileIn').onchange=e=>{
   const f=e.target.files[0];if(!f)return;const r=new FileReader();
-  r.onload=()=>{try{const d=JSON.parse(r.result);nodes=d.nodes||[];edges=d.edges||[];
-    if(d.lineRouting){lineRouting=d.lineRouting;document.getElementById('lineRouting').value=lineRouting;}
-    syncCounters();clearSel();renderNodes();renderEdges();
+  r.onload=()=>{try{const d=JSON.parse(r.result);
+    if(Array.isArray(d.cols))applyViewData(d);
+    else{nodes=d.nodes||[];edges=d.edges||[];
+      if(d.lineRouting){lineRouting=d.lineRouting;document.getElementById('lineRouting').value=lineRouting;}
+      syncCounters();clearSel();renderNodes();renderEdges();}
   }catch(err){alert('Invalid JSON');}};r.readAsText(f);
 };
 
@@ -797,7 +811,7 @@ const AI_CONTACT_MESSAGE='AI Assist is currently unavailable. Please contact dmd
 function currentViewData(){return{cols:COLS,styles:STYLES,nodes,edges,lineRouting};}
 function applyViewData(d){
   if(!d||!Array.isArray(d.cols)||!Array.isArray(d.nodes)||!Array.isArray(d.edges))throw new Error('Invalid view data');
-  COLS.splice(0,COLS.length,...d.cols);
+  COLS.splice(0,COLS.length,...d.cols.map(c=>({...c,color:columnColor(c)})));
   Object.keys(STYLES).forEach(k=>delete STYLES[k]);
   Object.assign(STYLES,d.styles||{});
   nodes=d.nodes||[];edges=d.edges||[];
@@ -818,6 +832,7 @@ async function readAiInput(){
   return{prompt,text:await file.text()};
 }
 function setAiStatus(message,isError=false){
+  ensureAiModal();
   const el=document.getElementById('aiStatus');
   el.textContent=message;
   el.classList.toggle('err',isError);
@@ -995,7 +1010,7 @@ function exportHTML(){
     const pathD=lineRouting==='straight'?straightPath(x1,y1,x2,y2,e):`M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
     svgEdges+=`<path d="${pathD}" fill="none" stroke="${e.color}" stroke-width="${st.w}" stroke-linecap="${st.cap}" ${dash}/>`;});
   let cols='',nodeHtml='';
-  COLS.forEach(c=>{cols+=`<div style="position:absolute;left:${c.x}px;top:0;width:${c.w}px;height:100%;background:#e9eef4;opacity:.5;border-radius:10px"></div>
+  COLS.forEach(c=>{cols+=`<div style="position:absolute;left:${c.x}px;top:0;width:${c.w}px;height:100%;background:${columnColor(c)};opacity:.5;border-radius:10px"></div>
     <div style="position:absolute;left:${c.x}px;top:14px;width:${c.w}px;text-align:center;font-weight:700;color:#3a4654;font:13px Segoe UI,sans-serif">${c.label}</div>`;});
   nodes.forEach(n=>{nodeHtml+=`<div style="position:absolute;left:${n.x}px;top:${n.y}px;width:${(n.w||184)}px;background:${n.color};color:#fff;border-radius:8px;padding:9px 11px;font:11.5px Segoe UI,sans-serif;line-height:1.3;box-shadow:0 4px 10px rgba(0,0,0,.12)">
     <b>${esc(n.title)}</b>${n.code?`<br><span style="font-size:9.5px;opacity:.85">${esc(n.code)}</span>`:''}</div>`;});
@@ -1063,7 +1078,7 @@ function buildMapCanvas(){
   ctx.fillStyle='#1d2530';
   ctx.fillText(`${badge2}  ${title2}`,PAD,HEADER_H*0.6);
   COLS.forEach(c=>{
-    ctx.fillStyle='rgba(233,238,244,0.55)';
+    ctx.fillStyle=hexToRgba(columnColor(c),0.55);
     roundRect(ctx,ox+c.x,oy-PAD+minY,c.w,maxY-minY+PAD*2,10); ctx.fill();
     ctx.font='bold 13px "Segoe UI",Helvetica,Arial,sans-serif';
     ctx.fillStyle='#3a4654'; ctx.textAlign='center';
@@ -1206,7 +1221,7 @@ function buildSlideCanvas(){
 
   // column backgrounds + labels
   COLS.forEach(c=>{
-    ctx.fillStyle='rgba(233,238,244,0.6)';
+    ctx.fillStyle=hexToRgba(columnColor(c),0.6);
     roundRect(ctx,c.x,minY,c.w,maxY-minY,10);ctx.fill();
     ctx.font='bold 13px "Segoe UI",Helvetica,Arial,sans-serif';
     ctx.fillStyle='#3a4654';ctx.textAlign='center';
@@ -1339,6 +1354,7 @@ function renderColEditor(){
   const box=document.getElementById('colEditor');
   box.innerHTML=COLS.map((c,i)=>`<div class="col-edit">
     <input class="col-label-input" type="text" value="${esc(c.label)}" data-ci="${i}" aria-label="Column label">
+    <input class="col-color-input" type="color" value="${columnColor(c)}" data-ci="${i}" aria-label="Column colour">
     <input class="col-width-input" type="number" min="160" max="360" step="10" value="${Math.round(c.w||COL_WIDTH)}" data-ci="${i}" aria-label="Column width">
     <button data-ci="${i}" title="Remove column">✕</button>
   </div>`).join('');
@@ -1356,6 +1372,13 @@ function renderColEditor(){
       inp.value=Math.round(COLS[ci].w);
       recalcColPositions();
       rebuildCols();renderNodes();renderEdges();inspect();
+    };
+  });
+  box.querySelectorAll('.col-color-input').forEach(inp=>{
+    inp.oninput=()=>{
+      const ci=+inp.dataset.ci;
+      COLS[ci].color=normaliseHexColor(inp.value);
+      rebuildCols();
     };
   });
   box.querySelectorAll('button').forEach(btn=>{
@@ -1376,7 +1399,7 @@ function renderColEditor(){
 document.getElementById('addColBtn').onclick=()=>{
   const lastCol=COLS[COLS.length-1];
   const newId=(lastCol?lastCol.id:0)+1;
-  COLS.push({id:newId,label:'New Level',x:(lastCol?lastCol.x+lastCol.w:0)+20,w:COL_WIDTH});
+  COLS.push({id:newId,label:'New Level',x:(lastCol?lastCol.x+lastCol.w:0)+20,w:COL_WIDTH,color:DEFAULT_COL_COLOR});
   recalcColPositions();
   rebuildCols();
   // Update node inspector AQF dropdown
@@ -1386,7 +1409,7 @@ document.getElementById('addColBtn').onclick=()=>{
 function recalcColPositions(){
   const previous=COLS.map(c=>({id:c.id,x:Number(c.x)||20,w:Number(c.w)||COL_WIDTH}));
   let x=20;
-  COLS.forEach(c=>{c.w=Math.max(160,Math.min(360,Number(c.w)||COL_WIDTH));c.x=x;x+=c.w+20;});
+  COLS.forEach(c=>{c.w=Math.max(160,Math.min(360,Number(c.w)||COL_WIDTH));c.color=columnColor(c);c.x=x;x+=c.w+20;});
   nodes.forEach(n=>{
     const col=COLS.find(c=>c.id===n.col);
     const old=previous.find(c=>c.id===n.col);
