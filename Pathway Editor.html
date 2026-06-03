@@ -93,6 +93,7 @@
   <button class="tool" id="expJson" style="display:none">⤓ JSON</button>
   <button class="tool" id="expHtml" style="display:none">⤓ HTML</button>
   <button class="tool" id="expPdf">⤓ PDF</button>
+  <button class="tool" id="expPng">⤓ PNG</button>
   <button class="tool" id="impBtn" style="display:none">⤒ Import</button>
   <input type="file" id="fileIn" accept=".json" hidden="">
 </header>
@@ -582,8 +583,7 @@ function wrapText(ctx,text,maxW){
   return lines;
 }
 
-document.getElementById('expPdf').onclick=function(){
-  // ---- compute bounding box ----
+function buildMapCanvas(){
   let minX=Infinity, minY=Infinity, maxX=0, maxY=0;
   COLS.forEach(c=>{minX=Math.min(minX,c.x);maxX=Math.max(maxX,c.x+c.w);});
   nodes.forEach(n=>{
@@ -592,7 +592,6 @@ document.getElementById('expPdf').onclick=function(){
     minX=Math.min(minX,n.x); minY=Math.min(minY,n.y);
     maxX=Math.max(maxX,n.x+(n.w||184)); maxY=Math.max(maxY,n.y+h);
   });
-
   const PAD=40, HEADER_H=60, LEGEND_H=80;
   const cW=maxX-minX+PAD*2, cH=maxY-minY+PAD*2+HEADER_H+LEGEND_H;
   const DPR=2;
@@ -601,18 +600,12 @@ document.getElementById('expPdf').onclick=function(){
   const ctx=canvas.getContext('2d');
   ctx.scale(DPR,DPR);
   const ox=-minX+PAD, oy=-minY+PAD+HEADER_H;
-
-  // background
   ctx.fillStyle='#f4f6f9'; ctx.fillRect(0,0,cW,cH);
-
-  // title
   const badge2=document.querySelector('.badge')?.textContent||'515T';
   const title2=document.querySelector('header h1')?.textContent||'Pathways';
   ctx.font='bold 20px "Segoe UI",Helvetica,Arial,sans-serif';
   ctx.fillStyle='#1d2530';
   ctx.fillText(`${badge2}  ${title2}`,PAD,HEADER_H*0.6);
-
-  // columns
   COLS.forEach(c=>{
     ctx.fillStyle='rgba(233,238,244,0.55)';
     roundRect(ctx,ox+c.x,oy-PAD+minY,c.w,maxY-minY+PAD*2,10); ctx.fill();
@@ -621,8 +614,6 @@ document.getElementById('expPdf').onclick=function(){
     ctx.fillText(c.label,ox+c.x+c.w/2,oy-PAD+minY+22);
     ctx.textAlign='left';
   });
-
-  // edges
   edges.forEach(e=>{
     const a=nodes.find(n=>n.id===e.from), b=nodes.find(n=>n.id===e.to);
     if(!a||!b) return;
@@ -640,8 +631,6 @@ document.getElementById('expPdf').onclick=function(){
     ctx.stroke();
   });
   ctx.setLineDash([]);
-
-  // nodes
   nodes.forEach(n=>{
     const el=document.querySelector(`.node[data-id="${n.id}"]`);
     const h=el?el.offsetHeight:54, w=n.w||184;
@@ -658,8 +647,6 @@ document.getElementById('expPdf').onclick=function(){
       ctx.globalAlpha=1;
     }
   });
-
-  // legend
   const legY2=oy+maxY+PAD+10;
   let legX2=PAD;
   Object.values(STYLES).forEach(v=>{
@@ -673,6 +660,20 @@ document.getElementById('expPdf').onclick=function(){
     ctx.fillText(v.label,legX2+46,legY2+4);
     legX2+=46+ctx.measureText(v.label).width+24;
   });
+  return {canvas, cW, cH, DPR};
+}
+
+document.getElementById('expPng').onclick=function(){
+  const {canvas}=buildMapCanvas();
+  const title2=document.querySelector('header h1')?.textContent||'pathways';
+  const fname=title2.replace(/[^a-z0-9]/gi,'_').toLowerCase()+'.png';
+  const a=document.createElement('a');
+  a.href=canvas.toDataURL('image/png');
+  a.download=fname; a.click();
+};
+
+document.getElementById('expPdf').onclick=function(){
+  const {canvas, cW, cH, DPR}=buildMapCanvas();
 
   // ---- Build PDF with JPEG image ----
   const jpegUrl=canvas.toDataURL('image/jpeg',0.95);
@@ -734,7 +735,9 @@ document.getElementById('expPdf').onclick=function(){
   const blob=new Blob(parts,{type:'application/pdf'});
   const u=URL.createObjectURL(blob);
   const a=document.createElement('a');
-  a.href=u; a.download='ci_pathways.pdf'; a.click();
+  const pdfTitle=document.querySelector('header h1')?.textContent||'pathways';
+  const pdfFname=pdfTitle.replace(/[^a-z0-9]/gi,'_').toLowerCase()+'.pdf';
+  a.href=u; a.download=pdfFname; a.click();
   URL.revokeObjectURL(u);
 };
 
