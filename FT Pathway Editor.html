@@ -144,8 +144,8 @@
   .view-meta{display:block;font-size:10.5px;color:var(--muted);margin-top:2px}
   .view-delete{border:1px solid var(--line);background:#fff;color:#c0392b;border-radius:7px;cursor:pointer;width:32px;height:30px;flex-shrink:0}
   .view-delete:hover{border-color:#c0392b;background:#fff5f3}
-  .ai-panel{border:1px solid var(--line);background:#f7f9fb;border-radius:8px;padding:10px;margin-bottom:16px}
-  .ai-panel textarea{min-height:78px;margin-bottom:8px;background:#fff}
+  .ai-panel{padding:14px}
+  .ai-panel textarea{min-height:132px;margin-bottom:8px;background:#fff}
   .ai-panel input[type=file]{width:100%;font:inherit;font-size:11px;margin:4px 0 8px;color:var(--muted)}
   .ai-actions{display:flex;align-items:center;gap:8px}
   .ai-actions .small-add{margin-top:0}
@@ -198,16 +198,6 @@
 
 <div class="wrap">
   <aside class="side">
-    <h2>VAL builder</h2>
-    <div class="ai-panel" id="aiPanel">
-      <textarea id="aiPrompt" placeholder="Paste pathway notes or describe the map to generate."></textarea>
-      <input type="file" id="aiFileIn" accept=".txt,.md,.csv,.json">
-      <div class="ai-actions">
-        <button class="small-add" id="aiGenerateBtn">Generate draft</button>
-      </div>
-      <div class="ai-status" id="aiStatus">Text files supported here. Keep VAL keys in the Worker.</div>
-    </div>
-
     <h2>Inspector</h2>
     <div id="inspector"><p class="empty">Select a box or a connection to edit it.</p></div>
 
@@ -965,15 +955,34 @@ function renderViewList(views){
     row.querySelector('.view-delete').onclick=e=>{e.stopPropagation();deleteCloudView(id,view?.name||'Untitled view').catch(err=>alert(err.message));};
   });
 }
+function ensureAiModal(){
+  if(document.getElementById('aiModal'))return;
+  document.body.insertAdjacentHTML('beforeend',`<div class="view-modal" id="aiModal" role="dialog" aria-modal="true" aria-labelledby="aiModalTitle">
+    <div class="view-panel">
+      <div class="view-head"><h3 id="aiModalTitle">AI Assist</h3><button class="view-close" id="aiClose">Close</button></div>
+      <div class="ai-panel" id="aiPanel">
+        <textarea id="aiPrompt" placeholder="Paste pathway notes or describe the map to generate."></textarea>
+        <input type="file" id="aiFileIn" accept=".txt,.md,.csv,.json">
+        <div class="ai-actions">
+          <button class="small-add" id="aiGenerateBtn">Generate draft</button>
+        </div>
+        <div class="ai-status" id="aiStatus">Text files supported here. Keep VAL keys in the Worker.</div>
+      </div>
+    </div>
+  </div>`);
+  document.getElementById('aiClose').onclick=closeAiModal;
+  document.getElementById('aiGenerateBtn').onclick=()=>generatePathwayDraft();
+  document.getElementById('aiModal').addEventListener('click',e=>{if(e.target.id==='aiModal')closeAiModal();});
+}
+function openAiModal(){
+  ensureAiModal();
+  document.getElementById('aiModal').classList.add('open');
+  document.getElementById('aiPrompt').focus();
+}
+function closeAiModal(){document.getElementById('aiModal')?.classList.remove('open');}
 document.getElementById('saveViewBtn').onclick=()=>saveCloudView().catch(err=>alert(err.message));
 document.getElementById('loadViewBtn').onclick=()=>loadCloudView().catch(err=>alert(err.message));
-document.getElementById('aiGenerateBtn').onclick=()=>generatePathwayDraft();
-document.getElementById('aiTopBtn').onclick=()=>{
-  document.querySelector('.side').scrollTo({top:0,behavior:'smooth'});
-  document.getElementById('aiPanel').style.boxShadow='0 0 0 3px rgba(212,84,58,.18)';
-  setTimeout(()=>{document.getElementById('aiPanel').style.boxShadow='';},900);
-  document.getElementById('aiPrompt').focus();
-};
+document.getElementById('aiTopBtn').onclick=openAiModal;
 
 document.getElementById('expHtml').onclick=exportHTML;
 function exportHTML(){
@@ -1466,7 +1475,7 @@ refreshMapSwitcherViews().catch(()=>{});
     {
       sel:'#aiTopBtn',placement:'bottom',
       title:'AI Assist',
-      text:'Click the VAL icon to jump to AI Assist. Paste pathway notes or upload a text file, then generate a draft map.'
+      text:'Click the VAL icon to open AI Assist. Paste pathway notes or upload a text file, then generate a draft map.'
     },
     {
       sel:'#viewsGroup',placement:'bottom',
