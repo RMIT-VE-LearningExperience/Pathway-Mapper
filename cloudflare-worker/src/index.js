@@ -7,7 +7,22 @@ const JSON_HEADERS = {
 };
 
 const MAX_VIEW_BYTES = 900000;
+const MAX_GENERATE_TEXT_BYTES = 120000;
 const EDITORS = new Set(["ci-compact", "ci-full", "ft"]);
+const PALETTE = [
+  "#3f9c54",
+  "#4aa1a6",
+  "#e07a52",
+  "#d4543a",
+  "#3aa0d6",
+  "#2c7fbf",
+  "#f06ba8",
+  "#d6202a",
+  "#2e3b8c",
+  "#7d3fa0",
+  "#c0392b",
+  "#1b2a4a"
+];
 
 export default {
   async fetch(request, env) {
@@ -28,6 +43,10 @@ export default {
 
       if (url.pathname === "/views" && request.method === "POST") {
         return createView(request, env);
+      }
+
+      if (url.pathname === "/generate-pathway" && request.method === "POST") {
+        return generatePathway(request, env);
       }
 
       const match = url.pathname.match(/^\/views\/([a-zA-Z0-9_-]+)$/);
@@ -111,6 +130,40 @@ async function deleteView(request, env, id) {
   return json({ ok: true });
 }
 
+async function generatePathway(request, env) {
+  if (!env.VAL_API_KEY) {
+    return json({ error: "VAL_API_KEY is not configured on the Worker" }, 400);
+  }
+
+  const body = await readJson(request);
+  const editor = validateEditor(body.editor);
+  const prompt = cleanLongText(body.prompt || "", 6000);
+  const sourceText = cleanLongText(body.text || "", MAX_GENERATE_TEXT_BYTES);
+  if (!prompt && !sourceText) {
+    return json({ error: "Add a prompt or paste document text first" }, 400);
+  }
+
+  const current = body.current && typeof body.current === "object" ? body.current : {};
+  const cols = Array.isArray(current.cols) && current.cols.length ? current.cols : defaultCols(editor);
+  const title = cleanName(body.title || current.title || "");
+  const valResult = await callVal(env, {
+    editor,
+    title,
+    prompt,
+    sourceText,
+    cols
+  });
+  const map = buildMapFromVal(valResult, cols, editor);
+
+  return json({
+    ok: true,
+    title: cleanName(valResult.title || title || "Generated pathway map"),
+    badge: cleanName(valResult.badge || ""),
+    data: map,
+    notes: Array.isArray(valResult.notes) ? valResult.notes.slice(0, 8).map(cleanName) : []
+  });
+}
+
 function buildRecord(body) {
   const now = new Date().toISOString();
   const id = crypto.randomUUID().split("-")[0];
@@ -185,8 +238,212 @@ function validateData(data) {
   return data;
 }
 
+async function callVal(env, input) {
+  const baseUrl = String(env.VAL_API_BASE_URL || "https://val-npe.rmit.edu.au/api").replace(/\/+$/, "");
+  const model = env.VAL_MODEL || "val-gpt-4o";
+  const schemaHint = {
+    title: "Short map title",
+    badge: "Optional school or portfolio code",
+    qualifications: [
+      {
+        id: "stable unique id such as q1",
+        title: "Qualification name",
+        code: "Course code if known",
+        aqfLevel: 4,
+        discipline: "Short grouping label",
+        color: "#3f9c54"
+      }
+    ],
+    connections: [
+      {
+        from: "source id or code",
+        to: "target id or code",
+        style: "credit",
+        rationale: "Short reason"
+      }
+    ],
+    notes: ["Short caveats about assumptions"]
+  };
+
+  const messages = [
+    {
+      role: "system",
+      content: [
+        "You build RMIT pathway editor data from curriculum notes.",
+        "Return only a JSON object. Do not include markdown.",
+        "Extract qualifications and pathway connections from the supplied text.",
+        "Use aqfLevel values that match the provided columns where possible.",
+        "Use connection style credit for guaranteed entry with credits, guar for guaranteed entry, await for awaiting approval, and nope for not guaranteed.",
+        "Do not invent course codes. Leave code empty if unknown."
+      ].join(" ")
+    },
+    {
+      role: "user",
+      content: JSON.stringify({
+        requestedEditor: input.editor,
+        currentTitle: input.title,
+        availableColumns: input.cols.map((c) => ({ id: c.id, label: c.label })),
+        requestedOutputShape: schemaHint,
+        userInstructions: input.prompt,
+        sourceText: input.sourceText
+      })
+    }
+  ];
+
+  const res = await fetch(`${baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "authorization": `Bearer ${env.VAL_API_KEY}`,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      model,
+      response_format: { type: "json_object" },
+      messages
+    })
+  });
+
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = payload.error?.message || payload.detail || `VAL request failed with ${res.status}`;
+    return Promise.reject(new Error(detail));
+  }
+
+  const raw = payload.choices?.[0]?.message?.content;
+  if (!raw) throw new Error("VAL returned no text output");
+  return parseJsonObject(raw);
+}
+
+function buildMapFromVal(result, cols, editor) {
+  const qualifications = Array.isArray(result.qualifications) ? result.qualifications : [];
+  if (!qualifications.length) {
+    throw new Error("VAL did not return any qualifications");
+  }
+
+  const cleanCols = cols.map((c, i) => ({
+    id: Number(c.id) || i + 1,
+    label: cleanName(c.label || `Level ${i + 1}`),
+    x: Number(c.x) || 20 + i * 230,
+    w: Number(c.w) || 210
+  }));
+  const colorByDiscipline = new Map();
+  const idByToken = new Map();
+  const groups = new Map();
+
+  const nodes = qualifications.slice(0, 140).map((q, index) => {
+    const col = findBestColumn(cleanCols, q.aqfLevel);
+    const discipline = cleanName(q.discipline || q.title || "Pathway");
+    if (!colorByDiscipline.has(discipline)) {
+      colorByDiscipline.set(discipline, cleanColor(q.color) || PALETTE[colorByDiscipline.size % PALETTE.length]);
+    }
+    const groupKey = String(col.id);
+    const row = groups.get(groupKey) || 0;
+    groups.set(groupKey, row + 1);
+    const id = `n${index + 1}`;
+    const code = cleanName(q.code || "");
+    const sourceId = cleanName(q.id || "");
+    [sourceId, code, q.title].filter(Boolean).forEach((token) => idByToken.set(normalToken(token), id));
+    return {
+      id,
+      title: cleanName(q.title || code || `Qualification ${index + 1}`),
+      code,
+      col: col.id,
+      color: colorByDiscipline.get(discipline),
+      x: col.x + 15,
+      y: 70 + row * 86,
+      w: editor === "ft" ? 182 : 184
+    };
+  });
+
+  const edges = [];
+  (Array.isArray(result.connections) ? result.connections : []).slice(0, 220).forEach((connection) => {
+    const from = idByToken.get(normalToken(connection.from));
+    const to = idByToken.get(normalToken(connection.to));
+    if (!from || !to || from === to) return;
+    const source = nodes.find((n) => n.id === from);
+    edges.push({
+      id: `e${edges.length + 1}`,
+      from,
+      to,
+      style: ["await", "guar", "credit", "nope"].includes(connection.style) ? connection.style : "guar",
+      color: source?.color || PALETTE[0]
+    });
+  });
+
+  return validateData({
+    cols: cleanCols,
+    styles: defaultStyles(),
+    nodes,
+    edges,
+    lineRouting: "straight"
+  });
+}
+
+function findBestColumn(cols, aqfLevel) {
+  const level = Number(aqfLevel);
+  if (Number.isFinite(level)) {
+    const direct = cols.find((c) => Number(c.id) === level);
+    if (direct) return direct;
+    const labelled = cols.find((c) => String(c.label).includes(String(level)));
+    if (labelled) return labelled;
+  }
+  return cols[Math.min(cols.length - 1, Math.max(0, Math.floor(cols.length / 2)))] || { id: 1, label: "Level", x: 20, w: 210 };
+}
+
+function defaultCols(editor) {
+  if (editor === "ft") {
+    return [
+      { id: 4, label: "AQF Level 4", x: 20, w: 200 },
+      { id: 5, label: "AQF Level 5", x: 240, w: 230 },
+      { id: 6, label: "AQF Level 6", x: 490, w: 230 },
+      { id: 7, label: "AQF Level 7", x: 740, w: 230 }
+    ];
+  }
+  return [
+    { id: 3, label: "AQF Level 3", x: 20, w: 190 },
+    { id: 4, label: "AQF Level 4", x: 225, w: 210 },
+    { id: 5, label: "AQF Level 5", x: 450, w: 210 },
+    { id: 6, label: "AQF Level 6", x: 675, w: 210 },
+    { id: 7, label: "AQF Level 7", x: 900, w: 210 }
+  ];
+}
+
+function defaultStyles() {
+  return {
+    await: { label: "Awaiting approval — guaranteed entry on completion", w: 2, dash: "6 5", cap: "butt" },
+    guar: { label: "Guaranteed entry on completion", w: 2, dash: "1 4", cap: "round" },
+    credit: { label: "Guaranteed entry on completion with credits", w: 3.4, dash: "none", cap: "butt" },
+    nope: { label: "Not guaranteed — credits if applicant accepted", w: 2, dash: "2 6", cap: "round" }
+  };
+}
+
+function parseJsonObject(raw) {
+  const text = String(raw).trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
+  try {
+    return JSON.parse(text);
+  } catch {
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    if (start >= 0 && end > start) return JSON.parse(text.slice(start, end + 1));
+    throw new Error("VAL returned invalid JSON");
+  }
+}
+
 function cleanName(value) {
   return String(value || "").trim().slice(0, 120);
+}
+
+function cleanLongText(value, max) {
+  return String(value || "").trim().slice(0, max);
+}
+
+function cleanColor(value) {
+  const color = String(value || "").trim();
+  return /^#[0-9a-f]{6}$/i.test(color) ? color : "";
+}
+
+function normalToken(value) {
+  return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
 function requireEditToken(request, record) {

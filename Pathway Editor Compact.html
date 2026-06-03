@@ -133,6 +133,13 @@
   .view-meta{display:block;font-size:10.5px;color:var(--muted);margin-top:2px}
   .view-delete{border:1px solid var(--line);background:#fff;color:#c0392b;border-radius:7px;cursor:pointer;width:32px;height:30px;flex-shrink:0}
   .view-delete:hover{border-color:#c0392b;background:#fff5f3}
+  .ai-panel{border:1px solid var(--line);background:#f7f9fb;border-radius:8px;padding:10px;margin-bottom:16px}
+  .ai-panel textarea{min-height:78px;margin-bottom:8px;background:#fff}
+  .ai-panel input[type=file]{width:100%;font:inherit;font-size:11px;margin:4px 0 8px;color:var(--muted)}
+  .ai-actions{display:flex;align-items:center;gap:8px}
+  .ai-actions .small-add{margin-top:0}
+  .ai-status{font-size:11px;color:var(--muted);line-height:1.35;margin-top:8px;min-height:15px}
+  .ai-status.err{color:#c0392b}
 </style>
 </head>
 <body>
@@ -175,6 +182,16 @@
 
 <div class="wrap">
   <aside class="side">
+    <h2>VAL builder</h2>
+    <div class="ai-panel">
+      <textarea id="aiPrompt" placeholder="Paste pathway notes or describe the map to generate."></textarea>
+      <input type="file" id="aiFileIn" accept=".txt,.md,.csv,.json">
+      <div class="ai-actions">
+        <button class="small-add" id="aiGenerateBtn">Generate draft</button>
+      </div>
+      <div class="ai-status" id="aiStatus">Text files supported here. Keep VAL keys in the Worker.</div>
+    </div>
+
     <h2>Inspector</h2>
     <div id="inspector"><p class="empty">Select a box or a connection to edit it.</p></div>
 
@@ -757,6 +774,48 @@ function applyViewData(d){
   syncCounters();clearSel();rebuildCols();renderNodes();renderEdges();renderLegend();inspect();renderColEditor();
 }
 function currentViewName(){return(document.querySelector('header h1')?.textContent||'Creative Industries view').trim();}
+async function readAiInput(){
+  const prompt=document.getElementById('aiPrompt').value.trim();
+  const file=document.getElementById('aiFileIn').files[0];
+  if(!file)return{prompt,text:''};
+  const ext=(file.name.split('.').pop()||'').toLowerCase();
+  if(!['txt','md','csv','json'].includes(ext)){
+    throw new Error('This page can read .txt, .md, .csv, and .json files. Convert Word/PDF/PPT to text first.');
+  }
+  if(file.size>120000)throw new Error('File is too large. Paste the most relevant pathway text instead.');
+  return{prompt,text:await file.text()};
+}
+function setAiStatus(message,isError=false){
+  const el=document.getElementById('aiStatus');
+  el.textContent=message;
+  el.classList.toggle('err',isError);
+}
+async function generatePathwayDraft(){
+  const btn=document.getElementById('aiGenerateBtn');
+  btn.disabled=true;
+  setAiStatus('Generating draft with VAL...');
+  try{
+    const input=await readAiInput();
+    if(!input.prompt&&!input.text)throw new Error('Paste pathway notes or choose a text file first.');
+    const res=await fetch(`${VIEW_API}/generate-pathway`,{
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({editor:EDITOR_ID,title:currentViewName(),prompt:input.prompt,text:input.text,current:currentViewData()})
+    });
+    const result=await res.json();
+    if(!res.ok)throw new Error(result.error||'Could not generate pathway');
+    if(!confirm(`Replace the current canvas with "${result.title||'generated pathway'}"?`))return;
+    if(result.title)document.querySelector('header h1').textContent=result.title;
+    if(result.badge)document.querySelector('header .badge').textContent=result.badge;
+    applyViewData(result.data);
+    host.scrollTo({left:0,top:0});
+    setAiStatus(result.notes?.length?`Generated. Notes: ${result.notes.join(' ')}`:'Generated draft map.');
+  }catch(err){
+    setAiStatus(err.message||'Generation failed',true);
+  }finally{
+    btn.disabled=false;
+  }
+}
 async function saveCloudView(){
   const name=prompt('Save this pathway view as:',currentViewName());
   if(!name)return;
@@ -827,6 +886,7 @@ function renderViewList(views){
 }
 document.getElementById('saveViewBtn').onclick=()=>saveCloudView().catch(err=>alert(err.message));
 document.getElementById('loadViewBtn').onclick=()=>loadCloudView().catch(err=>alert(err.message));
+document.getElementById('aiGenerateBtn').onclick=()=>generatePathwayDraft();
 
 document.getElementById('expHtml').onclick=exportHTML;
 function exportHTML(){
