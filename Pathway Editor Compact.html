@@ -986,7 +986,7 @@ function buildMapCanvas(){
     minX=Math.min(minX,n.x); minY=Math.min(minY,n.y);
     maxX=Math.max(maxX,n.x+(n.w||184)); maxY=Math.max(maxY,n.y+h);
   });
-  const PAD=40, HEADER_H=60, LEGEND_H=80;
+  const PAD=40, HEADER_H=60, LEGEND_H=140;
   const cW=maxX-minX+PAD*2, cH=maxY-minY+PAD*2+HEADER_H+LEGEND_H;
   const DPR=2;
   const canvas=document.createElement('canvas');
@@ -1041,18 +1041,22 @@ function buildMapCanvas(){
       ctx.globalAlpha=1;
     }
   });
-  const legY2=oy+maxY+PAD+10;
+  let legY2=oy+maxY+PAD+10;
   let legX2=PAD;
+  const legMaxX=cW-PAD, legGap=24, legRowH=24;
+  ctx.font='12px "Segoe UI",Helvetica,Arial,sans-serif';
   Object.values(STYLES).forEach(v=>{
+    const labelW=ctx.measureText(v.label).width;
+    const itemW=46+labelW;
+    if(legX2>PAD&&legX2+itemW>legMaxX){legX2=PAD;legY2+=legRowH;}
     ctx.beginPath(); ctx.strokeStyle='#333'; ctx.lineWidth=v.w; ctx.lineCap=v.cap;
     if(v.dash!=='none') ctx.setLineDash(v.dash.split(' ').map(Number));
     else ctx.setLineDash([]);
     ctx.moveTo(legX2,legY2); ctx.lineTo(legX2+40,legY2); ctx.stroke();
     ctx.setLineDash([]);
     ctx.fillStyle='#1d2530';
-    ctx.font='12px "Segoe UI",Helvetica,Arial,sans-serif';
     ctx.fillText(v.label,legX2+46,legY2+4);
-    legX2+=46+ctx.measureText(v.label).width+24;
+    legX2+=itemW+legGap;
   });
   return {canvas, cW, cH, DPR};
 }
