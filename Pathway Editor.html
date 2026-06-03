@@ -439,14 +439,14 @@ window.addEventListener('mousemove',ev=>{
   const p=boardXY(ev);
   if(multiDragOffsets.length>1){
     multiDragOffsets.forEach(({node,dx,dy})=>{
-      node.x=Math.round((p.x-dx)/14)*14;
-      node.y=Math.round((p.y-dy)/14)*14;
+      node.x=Math.round((p.x-dx)/7)*7;
+      node.y=Math.round((p.y-dy)/7)*7;
       const el=document.querySelector(`.node[data-id="${node.id}"]`);
       if(el){el.style.left=node.x+'px';el.style.top=node.y+'px';}
     });
   }else{
-    dragNode.x=Math.round((p.x-drag.dx)/14)*14;
-    dragNode.y=Math.round((p.y-drag.dy)/14)*14;
+    dragNode.x=Math.round((p.x-drag.dx)/7)*7;
+    dragNode.y=Math.round((p.y-drag.dy)/7)*7;
     dragEl.style.left=dragNode.x+'px'; dragEl.style.top=dragNode.y+'px';
   }
   renderEdges();
@@ -570,9 +570,9 @@ function inspect(){
       <label class="fld">Straight line position</label>
       <div class="hint">Set Line routing to Straight, then use arrows or these buttons to move the bend.</div>
       <div class="nudge-grid">
-        <span class="blank"></span><button data-dx="0" data-dy="-14">↑</button><span class="blank"></span>
-        <button data-dx="-14" data-dy="0">←</button><button data-reset="1">↺</button><button data-dx="14" data-dy="0">→</button>
-        <span class="blank"></span><button data-dx="0" data-dy="14">↓</button><span class="blank"></span>
+        <span class="blank"></span><button data-dx="0" data-dy="-7">↑</button><span class="blank"></span>
+        <button data-dx="-7" data-dy="0">←</button><button data-reset="1">↺</button><button data-dx="7" data-dy="0">→</button>
+        <span class="blank"></span><button data-dx="0" data-dy="7">↓</button><span class="blank"></span>
       </div>`;
     document.getElementById('e-style').onchange=ev=>{e.style=ev.target.value;renderEdges();};
     box.querySelectorAll('.sw').forEach(s=>s.onclick=()=>{e.color=s.dataset.c;renderEdges();inspect();});
@@ -639,7 +639,7 @@ document.addEventListener('keydown',e=>{if((e.key==='Delete'||e.key==='Backspace
   if(selNodes.size>0&&!selEdge&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){
     if(isEditingText())return;
     e.preventDefault();
-    const step=e.shiftKey?28:14;
+    const step=e.shiftKey?28:7;
     const dx=e.key==='ArrowLeft'?-step:e.key==='ArrowRight'?step:0;
     const dy=e.key==='ArrowUp'?-step:e.key==='ArrowDown'?step:0;
     nudgeSelectedNodes(dx,dy);
@@ -647,7 +647,7 @@ document.addEventListener('keydown',e=>{if((e.key==='Delete'||e.key==='Backspace
   if(selEdge&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){
     if(isEditingText())return;
     e.preventDefault();
-    const step=e.shiftKey?28:14;
+    const step=e.shiftKey?28:7;
     const edge=edges.find(x=>x.id===selEdge);
     const dx=e.key==='ArrowLeft'?-step:e.key==='ArrowRight'?step:0;
     const dy=e.key==='ArrowUp'?-step:e.key==='ArrowDown'?step:0;
