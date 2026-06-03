@@ -31,7 +31,7 @@
   .canvas-host{flex:1;overflow:auto;position:relative;background:
     linear-gradient(var(--line) 1px,transparent 1px) 0 0/100% 28px,
     linear-gradient(90deg,var(--line) 1px,transparent 1px) 0 0/28px 100%,var(--bg)}
-  #board{position:relative;width:1300px;height:1000px}
+  #board{position:relative;width:1300px;height:1400px}
   /* ---- column headers ---- */
   .col{position:absolute;top:0;bottom:0;background:var(--col);border-radius:10px;opacity:.55}
   .col-label{position:absolute;top:10px;font-size:12px;font-weight:700;color:#3a4654;width:100%;text-align:center;letter-spacing:.4px}
@@ -286,7 +286,7 @@ let lineRouting='curved';
 // ===== seed: Creative Industries map =====
 function seed(){
   const def=(id,title,code,col,row,color)=>({id,title,code,col,color,
-    x:COLS.find(c=>c.id===col).x+15, y:50+row*46, w:180});
+    x:COLS.find(c=>c.id===col).x+15, y:50+row*72, w:180});
   nodes=[
     // Row layout: 1-row gap between discipline clusters, no large jumps
     // ---- AQF 3 ----
