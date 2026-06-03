@@ -97,6 +97,7 @@
   <button class="tool" id="expHtml" style="display:none">⤓ HTML</button>
   <button class="tool" id="expPdf">⤓ PDF</button>
   <button class="tool" id="expPng">⤓ PNG</button>
+  <button class="tool" id="expSlide">⤓ Slide</button>
   <button class="tool" id="impBtn">⤒ Import</button>
   <input type="file" id="fileIn" accept=".json" hidden="">
 </header>
@@ -684,6 +685,136 @@ document.getElementById('expPng').onclick=function(){
   a.download=fname; a.click();
 };
 
+function buildSlideCanvas(){
+  // bounding box
+  let minX=Infinity,minY=Infinity,maxX=0,maxY=0;
+  COLS.forEach(c=>{minX=Math.min(minX,c.x);maxX=Math.max(maxX,c.x+c.w);});
+  nodes.forEach(n=>{
+    const el=document.querySelector(`.node[data-id="${n.id}"]`);
+    const h=el?el.offsetHeight:54;
+    minX=Math.min(minX,n.x);minY=Math.min(minY,n.y);
+    maxX=Math.max(maxX,n.x+(n.w||184));maxY=Math.max(maxY,n.y+h);
+  });
+
+  const SW=1920,SH=1080,DPR=2;
+  const canvas=document.createElement('canvas');
+  canvas.width=SW*DPR;canvas.height=SH*DPR;
+  const ctx=canvas.getContext('2d');
+  ctx.scale(DPR,DPR);
+
+  // background
+  ctx.fillStyle='#f4f6f9';ctx.fillRect(0,0,SW,SH);
+
+  // header bar
+  const HDRH=48,PAD=28;
+  ctx.fillStyle='#ffffff';ctx.fillRect(0,0,SW,HDRH);
+  ctx.strokeStyle='#dfe5ec';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(0,HDRH);ctx.lineTo(SW,HDRH);ctx.stroke();
+  const badge2=document.querySelector('.badge')?.textContent||'';
+  const title2=document.querySelector('header h1')?.textContent||'Pathways';
+  // badge pill
+  if(badge2){
+    ctx.font='bold 11px "Segoe UI",Helvetica,Arial,sans-serif';
+    const bw=ctx.measureText(badge2).width+14;
+    ctx.fillStyle='#d4543a';roundRect(ctx,PAD,14,bw,20,10);ctx.fill();
+    ctx.fillStyle='#fff';ctx.fillText(badge2,PAD+7,28);
+    ctx.font='bold 18px "Segoe UI",Helvetica,Arial,sans-serif';
+    ctx.fillStyle='#1d2530';ctx.fillText(title2,PAD+bw+10,30);
+  } else {
+    ctx.font='bold 18px "Segoe UI",Helvetica,Arial,sans-serif';
+    ctx.fillStyle='#1d2530';ctx.fillText(title2,PAD,30);
+  }
+
+  // legend strip at bottom
+  const LEGH=28;
+  ctx.fillStyle='#ffffff';ctx.fillRect(0,SH-LEGH,SW,LEGH);
+  ctx.strokeStyle='#dfe5ec';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(0,SH-LEGH);ctx.lineTo(SW,SH-LEGH);ctx.stroke();
+  let legX=PAD;const legY=SH-LEGH/2+1;
+  ctx.font='10.5px "Segoe UI",Helvetica,Arial,sans-serif';
+  Object.values(STYLES).forEach(v=>{
+    ctx.beginPath();ctx.strokeStyle='#444';ctx.lineWidth=v.w;ctx.lineCap=v.cap;
+    if(v.dash!=='none')ctx.setLineDash(v.dash.split(' ').map(Number));
+    else ctx.setLineDash([]);
+    ctx.moveTo(legX,legY);ctx.lineTo(legX+30,legY);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='#4a5568';ctx.lineWidth=1;
+    ctx.fillText(v.label,legX+34,legY+4);
+    legX+=34+ctx.measureText(v.label).width+20;
+  });
+
+  // content area: fit map into the space between header and legend
+  const availW=SW-PAD*2;
+  const availH=SH-HDRH-LEGH-PAD;
+  const contentW=maxX-minX;
+  const contentH=maxY-minY;
+  const scale=Math.min(availW/contentW, availH/contentH);
+  const drawW=contentW*scale,drawH=contentH*scale;
+  const tx=PAD+(availW-drawW)/2 - minX*scale;
+  const ty=HDRH+PAD/2+(availH-drawH)/2 - minY*scale;
+
+  ctx.save();
+  ctx.translate(tx,ty);
+  ctx.scale(scale,scale);
+
+  // column backgrounds + labels
+  COLS.forEach(c=>{
+    ctx.fillStyle='rgba(233,238,244,0.6)';
+    roundRect(ctx,c.x,minY,c.w,maxY-minY,10);ctx.fill();
+    ctx.font='bold 13px "Segoe UI",Helvetica,Arial,sans-serif';
+    ctx.fillStyle='#3a4654';ctx.textAlign='center';
+    ctx.fillText(c.label,c.x+c.w/2,minY-6);
+    ctx.textAlign='left';
+  });
+
+  // edges
+  edges.forEach(e=>{
+    const a=nodes.find(n=>n.id===e.from),b=nodes.find(n=>n.id===e.to);
+    if(!a||!b)return;
+    const ra=nodeRect(a),rb=nodeRect(b);
+    const x1=ra.x+ra.w,y1=ra.y+ra.h/2,x2=rb.x,y2=rb.y+rb.h/2,mx=(x1+x2)/2;
+    const st=STYLES[e.style]||STYLES.guar;
+    ctx.beginPath();ctx.strokeStyle=e.color||'#555';
+    ctx.lineWidth=st.w;ctx.lineCap=st.cap;
+    if(st.dash!=='none')ctx.setLineDash(st.dash.split(' ').map(Number));
+    else ctx.setLineDash([]);
+    ctx.moveTo(x1,y1);
+    if(lineRouting==='straight'){ctx.lineTo(mx,y1);ctx.lineTo(mx,y2);ctx.lineTo(x2,y2);}
+    else ctx.bezierCurveTo(mx,y1,mx,y2,x2,y2);
+    ctx.stroke();
+  });
+  ctx.setLineDash([]);
+
+  // nodes
+  nodes.forEach(n=>{
+    const el=document.querySelector(`.node[data-id="${n.id}"]`);
+    const h=el?el.offsetHeight:54,w=n.w||184;
+    ctx.fillStyle=n.color;roundRect(ctx,n.x,n.y,w,h,8);ctx.fill();
+    ctx.fillStyle='#fff';
+    ctx.font='bold 11.5px "Segoe UI",Helvetica,Arial,sans-serif';
+    const lines=wrapText(ctx,n.title,w-16);
+    lines.forEach((ln,i)=>ctx.fillText(ln,n.x+8,n.y+15+i*14));
+    if(n.code){
+      ctx.font='600 9.5px "Segoe UI",Helvetica,Arial,sans-serif';
+      ctx.globalAlpha=0.85;
+      ctx.fillText(n.code,n.x+8,n.y+15+lines.length*14+4);
+      ctx.globalAlpha=1;
+    }
+  });
+
+  ctx.restore();
+  return canvas;
+}
+
+document.getElementById('expSlide').onclick=function(){
+  const canvas=buildSlideCanvas();
+  const title2=document.querySelector('header h1')?.textContent||'pathways';
+  const fname=title2.replace(/[^a-z0-9]/gi,'_').toLowerCase()+'_slide.png';
+  const a=document.createElement('a');
+  a.href=canvas.toDataURL('image/png');
+  a.download=fname;a.click();
+};
+
 document.getElementById('expPdf').onclick=function(){
   const {canvas, cW, cH, DPR}=buildMapCanvas();
 
@@ -889,8 +1020,8 @@ seed();renderCols();renderNodes();renderEdges();renderLegend();inspect();renderC
     },
     {
       sel:'#expPdf',placement:'bottom',
-      title:'Export to PDF',
-      text:'Renders your full pathway map as a high-quality PDF, including the title and course code from the editable header.'
+      title:'Export',
+      text:'Export your map as a PDF (printable), PNG (image), or Slide (1920×1080 PNG scaled to fit a PowerPoint landscape slide).'
     },
     {
       sel:'.side',placement:'right',
