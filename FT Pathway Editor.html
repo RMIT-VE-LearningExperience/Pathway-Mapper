@@ -27,6 +27,7 @@
   button.tool:hover{border-color:var(--accent);color:var(--accent)}
   button.tool.active{background:var(--accent);color:#fff;border-color:var(--accent)}
   button.tool.danger:hover{border-color:#c0392b;color:#c0392b}
+  button.tool:disabled{opacity:.45;cursor:not-allowed}
   button.tool.loading{position:relative;color:transparent;pointer-events:none}
   button.tool.loading::after{content:"";position:absolute;inset:0;margin:auto;width:14px;height:14px;border:2px solid #dfe5ec;border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
@@ -172,6 +173,8 @@
     </div>
   </div>
   <div class="spacer"></div>
+  <button class="tool" id="undoBtn" title="Undo" aria-label="Undo" disabled>↶</button>
+  <button class="tool" id="redoBtn" title="Redo" aria-label="Redo" disabled>↷</button>
   <button class="tool" id="addBtn">＋ Add box</button>
   <button class="tool danger" id="delBtn">✕ Delete</button>
   <div class="exp-group" id="viewsGroup">
@@ -567,6 +570,7 @@ function attachNode(el,n){
     if(ev.shiftKey){selectNode(n.id,true);return;}
     const p=boardXY(ev);
     if(selNodes.size>1&&selNodes.has(n.id)){
+      pushHistory();
       multiDragOffsets=[...selNodes].map(id=>{
         const node=nodes.find(x=>x.id===id);
         return{node,dx:p.x-node.x,dy:p.y-node.y};
@@ -578,6 +582,7 @@ function attachNode(el,n){
     }
     multiDragOffsets=[];
     dragNode=n;
+    pushHistory();
     selectNode(n.id);
     dragEl=document.querySelector(`.node[data-id="${n.id}"]`);
     const p2=boardXY(ev);
@@ -595,6 +600,7 @@ function attachNode(el,n){
   });
   el.addEventListener('mouseup',ev=>{
     if(linkFrom && linkFrom!==n.id){
+      pushHistory();
       edges.push({id:'e'+(nextE++),from:linkFrom,to:n.id,style:'guar',color:n.color});
       linkFrom=null; setLink(false); renderNodes(); renderEdges();
     }
@@ -630,10 +636,10 @@ function inspect(){
       <select id="f-col">${COLS.map(c=>`<option value="${c.id}" ${c.id===n.col?'selected':''}>${c.label}</option>`).join('')}</select>
       <label class="fld">Colour</label>
       <div class="swatch-row">${PALETTE.map(c=>`<div class="sw ${c===n.color?'on':''}" data-c="${c}" style="background:${c}"></div>`).join('')}</div>`;
-    document.getElementById('f-title').oninput=e=>{n.title=e.target.value;renderNodes();renderEdges();};
-    document.getElementById('f-code').oninput=e=>{n.code=e.target.value;renderNodes();renderEdges();};
-    document.getElementById('f-col').onchange=e=>{n.col=+e.target.value;n.x=COLS.find(c=>c.id===n.col).x+15;renderNodes();renderEdges();};
-    box.querySelectorAll('.sw').forEach(s=>s.onclick=()=>{n.color=s.dataset.c;renderNodes();renderEdges();inspect();});
+    document.getElementById('f-title').oninput=e=>{pushHistory();n.title=e.target.value;renderNodes();renderEdges();};
+    document.getElementById('f-code').oninput=e=>{pushHistory();n.code=e.target.value;renderNodes();renderEdges();};
+    document.getElementById('f-col').onchange=e=>{pushHistory();n.col=+e.target.value;n.x=COLS.find(c=>c.id===n.col).x+15;renderNodes();renderEdges();};
+    box.querySelectorAll('.sw').forEach(s=>s.onclick=()=>{pushHistory();n.color=s.dataset.c;renderNodes();renderEdges();inspect();});
   }else if(selEdge){
     const e=edges.find(x=>x.id===selEdge);
     const a=nodes.find(n=>n.id===e.from), b=nodes.find(n=>n.id===e.to);
@@ -650,9 +656,10 @@ function inspect(){
         <button data-dx="-7" data-dy="0">←</button><button data-reset="1">↺</button><button data-dx="7" data-dy="0">→</button>
         <span class="blank"></span><button data-dx="0" data-dy="7">↓</button><span class="blank"></span>
       </div>`;
-    document.getElementById('e-style').onchange=ev=>{e.style=ev.target.value;renderEdges();};
-    box.querySelectorAll('.sw').forEach(s=>s.onclick=()=>{e.color=s.dataset.c;renderEdges();inspect();});
+    document.getElementById('e-style').onchange=ev=>{pushHistory();e.style=ev.target.value;renderEdges();};
+    box.querySelectorAll('.sw').forEach(s=>s.onclick=()=>{pushHistory();e.color=s.dataset.c;renderEdges();inspect();});
     box.querySelectorAll('.nudge-grid button').forEach(btn=>btn.onclick=()=>{
+      pushHistory();
       if(btn.dataset.reset){delete e.bendX;delete e.bendY;}
       else nudgeEdge(e,+btn.dataset.dx,+btn.dataset.dy);
       renderEdges();
@@ -675,6 +682,7 @@ function renderLegend(){
   L.querySelectorAll('.legend-label').forEach(span=>{
     const key=span.closest('[data-style]').dataset.style;
     span.addEventListener('input',()=>{
+      pushHistory();
       STYLES[key].label=span.textContent.trim()||STYLES[key].label;
       const opt=document.querySelector(`#e-style option[value="${key}"]`);
       if(opt) opt.textContent=STYLES[key].label;
@@ -693,6 +701,7 @@ document.querySelectorAll('a.map-sw-item').forEach(a=>{
   });
 });
 document.getElementById('addBtn').onclick=()=>{
+  pushHistory();
   const n={id:'n'+(nextN++),title:'New qualification',code:'',col:6,
     x:COLS[2].x+15,y:host.scrollTop+120,w:182,color:PALETTE[0]};
   nodes.push(n); renderNodes(); renderEdges(); selectNode(n.id);
@@ -719,6 +728,7 @@ document.querySelectorAll('#expGroup .exp-menu button,#viewsGroup .exp-menu butt
   document.getElementById('viewsGroup').classList.remove('open');
 }));
 function deleteSelection(){
+  pushHistory();
   if(selNodes.size>0){
     const ids=[...selNodes];
     nodes=nodes.filter(n=>!ids.includes(n.id));
@@ -742,6 +752,7 @@ function createNewMap(){
   if(!confirm('Create a new blank map? Unsaved changes on this canvas will be cleared.'))return;
   const title=prompt('Map title:','Future Technologies — New Pathway Map');
   if(title===null)return;
+  pushHistory();
   document.querySelector('header h1').textContent=title.trim()||'Future Technologies — New Pathway Map';
   nodes=[];edges=[];nextN=1;nextE=1;selNode=null;selEdge=null;selNodes.clear();linkFrom=null;
   lineRouting='straight';document.getElementById('lineRouting').value=lineRouting;
@@ -750,9 +761,15 @@ function createNewMap(){
 }
 document.addEventListener('keydown',e=>{if((e.key==='Delete'||e.key==='Backspace')&&(selNode||selEdge||selNodes.size)){
   if(isEditingText())return;deleteWithFeedback();}
+  if((e.metaKey||e.ctrlKey)&&!isEditingText()){
+    const key=e.key.toLowerCase();
+    if(key==='z'){e.preventDefault();e.shiftKey?redoChange():undoChange();return;}
+    if(key==='y'){e.preventDefault();redoChange();return;}
+  }
   if(selNodes.size>0&&!selEdge&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){
     if(isEditingText())return;
     e.preventDefault();
+    pushHistory();
     const step=e.shiftKey?28:7;
     const dx=e.key==='ArrowLeft'?-step:e.key==='ArrowRight'?step:0;
     const dy=e.key==='ArrowUp'?-step:e.key==='ArrowDown'?step:0;
@@ -765,7 +782,7 @@ document.addEventListener('keydown',e=>{if((e.key==='Delete'||e.key==='Backspace
     const edge=edges.find(x=>x.id===selEdge);
     const dx=e.key==='ArrowLeft'?-step:e.key==='ArrowRight'?step:0;
     const dy=e.key==='ArrowUp'?-step:e.key==='ArrowDown'?step:0;
-    if(edge){nudgeEdge(edge,dx,dy);renderEdges();}
+    if(edge){pushHistory();nudgeEdge(edge,dx,dy);renderEdges();}
   }
   if(e.key==='Escape')clearSel();});
 host.addEventListener('click',()=>clearSel());
@@ -797,6 +814,7 @@ document.getElementById('impBtn').onclick=()=>document.getElementById('fileIn').
 document.getElementById('fileIn').onchange=e=>{
   const f=e.target.files[0];if(!f)return;const r=new FileReader();
   r.onload=()=>{try{const d=JSON.parse(r.result);
+    pushHistory();
     if(Array.isArray(d.cols))applyViewData(d);
     else{nodes=d.nodes||[];edges=d.edges||[];
       if(d.lineRouting){lineRouting=d.lineRouting;document.getElementById('lineRouting').value=lineRouting;}
@@ -808,7 +826,52 @@ document.getElementById('fileIn').onchange=e=>{
 const VIEW_API='https://pathway-editor-views.lawrence-makoona.workers.dev';
 const EDITOR_ID='ft';
 const AI_CONTACT_MESSAGE='AI Assist is currently unavailable. Please contact dmd.cove@rmit.edu.au to reactivate the API capabilities.';
+let undoStack=[], redoStack=[], restoringHistory=false;
 function currentViewData(){return{cols:COLS,styles:STYLES,nodes,edges,lineRouting};}
+function cloneState(value){return JSON.parse(JSON.stringify(value));}
+function editorSnapshot(){
+  return{
+    badge:(document.querySelector('header .badge')?.textContent||'').trim(),
+    title:(document.querySelector('header h1')?.textContent||'').trim(),
+    data:cloneState(currentViewData()),
+    nextN,nextE
+  };
+}
+function updateHistoryButtons(){
+  const undo=document.getElementById('undoBtn'), redo=document.getElementById('redoBtn');
+  if(undo)undo.disabled=!undoStack.length;
+  if(redo)redo.disabled=!redoStack.length;
+}
+function pushHistory(){
+  if(restoringHistory)return;
+  undoStack.push(editorSnapshot());
+  if(undoStack.length>100)undoStack.shift();
+  redoStack=[];
+  updateHistoryButtons();
+}
+function restoreSnapshot(snapshot){
+  if(!snapshot)return;
+  restoringHistory=true;
+  document.querySelector('header .badge').textContent=snapshot.badge||'';
+  document.querySelector('header h1').textContent=snapshot.title||'Pathways Editor';
+  applyViewData(cloneState(snapshot.data));
+  nextN=snapshot.nextN||nextN;
+  nextE=snapshot.nextE||nextE;
+  restoringHistory=false;
+  updateHistoryButtons();
+}
+function undoChange(){
+  if(!undoStack.length)return;
+  const previous=undoStack.pop();
+  redoStack.push(editorSnapshot());
+  restoreSnapshot(previous);
+}
+function redoChange(){
+  if(!redoStack.length)return;
+  const next=redoStack.pop();
+  undoStack.push(editorSnapshot());
+  restoreSnapshot(next);
+}
 function applyViewData(d){
   if(!d||!Array.isArray(d.cols)||!Array.isArray(d.nodes)||!Array.isArray(d.edges))throw new Error('Invalid view data');
   COLS.splice(0,COLS.length,...d.cols.map(c=>({...c,color:columnColor(c)})));
@@ -855,6 +918,7 @@ async function generatePathwayDraft(){
       throw new Error(result.error||'Could not generate pathway');
     }
     if(!confirm(`Replace the current canvas with "${result.title||'generated pathway'}"?`))return;
+    pushHistory();
     if(result.title)document.querySelector('header h1').textContent=result.title;
     if(result.badge)document.querySelector('header .badge').textContent=result.badge;
     applyViewData(result.data);
@@ -891,6 +955,7 @@ async function loadCloudViewById(id){
   const viewRes=await fetch(`${VIEW_API}/views/${encodeURIComponent(id)}`);
   const view=await viewRes.json();
   if(!viewRes.ok)throw new Error(view.error||'Could not load view');
+  pushHistory();
   if(view.title)document.querySelector('header h1').textContent=view.title;
   if(view.badge)document.querySelector('header .badge').textContent=view.badge;
   applyViewData(view.data);
@@ -997,6 +1062,9 @@ function openAiModal(){
 function closeAiModal(){document.getElementById('aiModal')?.classList.remove('open');}
 document.getElementById('saveViewBtn').onclick=()=>saveCloudView().catch(err=>alert(err.message));
 document.getElementById('loadViewBtn').onclick=()=>loadCloudView().catch(err=>alert(err.message));
+document.getElementById('undoBtn').onclick=undoChange;
+document.getElementById('redoBtn').onclick=redoChange;
+document.querySelectorAll('header .badge,header h1').forEach(el=>el.addEventListener('beforeinput',pushHistory));
 document.getElementById('aiTopBtn').onclick=openAiModal;
 
 document.getElementById('expHtml').onclick=exportHTML;
@@ -1347,7 +1415,7 @@ document.getElementById('expPdf').onclick=function(){
 };
 
 // ===== options =====
-document.getElementById('lineRouting').onchange=e=>{lineRouting=e.target.value;renderEdges();};
+document.getElementById('lineRouting').onchange=e=>{pushHistory();lineRouting=e.target.value;renderEdges();};
 
 // ===== column editor =====
 function renderColEditor(){
@@ -1360,6 +1428,7 @@ function renderColEditor(){
   </div>`).join('');
   box.querySelectorAll('.col-label-input').forEach(inp=>{
     inp.oninput=()=>{
+      pushHistory();
       const ci=+inp.dataset.ci;
       COLS[ci].label=inp.value;
       rebuildCols();
@@ -1367,6 +1436,7 @@ function renderColEditor(){
   });
   box.querySelectorAll('.col-width-input').forEach(inp=>{
     inp.onchange=()=>{
+      pushHistory();
       const ci=+inp.dataset.ci;
       COLS[ci].w=Math.max(160,Math.min(360,Number(inp.value)||COL_WIDTH));
       inp.value=Math.round(COLS[ci].w);
@@ -1376,6 +1446,7 @@ function renderColEditor(){
   });
   box.querySelectorAll('.col-color-input').forEach(inp=>{
     inp.oninput=()=>{
+      pushHistory();
       const ci=+inp.dataset.ci;
       COLS[ci].color=normaliseHexColor(inp.value);
       rebuildCols();
@@ -1383,6 +1454,7 @@ function renderColEditor(){
   });
   box.querySelectorAll('button').forEach(btn=>{
     btn.onclick=()=>{
+      pushHistory();
       const ci=+btn.dataset.ci;
       const removed=COLS[ci];
       // Remove nodes in this column
@@ -1397,6 +1469,7 @@ function renderColEditor(){
   });
 }
 document.getElementById('addColBtn').onclick=()=>{
+  pushHistory();
   const lastCol=COLS[COLS.length-1];
   const newId=(lastCol?lastCol.id:0)+1;
   COLS.push({id:newId,label:'New Level',x:(lastCol?lastCol.x+lastCol.w:0)+20,w:COL_WIDTH,color:DEFAULT_COL_COLOR});
@@ -1427,7 +1500,7 @@ function rebuildCols(){
 }
 
 // ===== boot =====
-seed();rebuildCols();renderNodes();renderEdges();renderLegend();inspect();renderColEditor();
+seed();rebuildCols();renderNodes();renderEdges();renderLegend();inspect();renderColEditor();updateHistoryButtons();
 loadLatestCloudView().catch(err=>setAiStatus(`Could not load latest saved view: ${err.message}`,true));
 refreshMapSwitcherViews().catch(()=>{});
 </script>
@@ -1483,7 +1556,7 @@ refreshMapSwitcherViews().catch(()=>{});
 
 <script>
 (function(){
-  const TOUR_VERSION='2026-06-03-ui-refresh';
+  const TOUR_VERSION='2026-06-03-undo-redo';
   const STEPS=[
     {
       target:null,placement:'center',
@@ -1511,6 +1584,11 @@ refreshMapSwitcherViews().catch(()=>{});
       text:'Creates a new course or qualification. Drag it into position, or use arrow keys to move selected boxes by quarter-grid steps.'
     },
     {
+      els:['#undoBtn','#redoBtn'],placement:'bottom',
+      title:'Undo & Redo',
+      text:'Use the arrow buttons to step layout and content edits backward or forward. Keyboard shortcuts Ctrl/Cmd+Z and Ctrl/Cmd+Y work when you are not typing in a field.'
+    },
+    {
       sel:'#delBtn',placement:'bottom',
       title:'Delete Feedback',
       text:'Select a box or connection, then click Delete or press the Delete key. A short loading spinner shows while the item is removed.'
@@ -1523,7 +1601,7 @@ refreshMapSwitcherViews().catch(()=>{});
     {
       sel:'.side',placement:'right',
       title:'Inspector & Options',
-      text:'Use the Inspector to edit selected boxes and connections. Straight connector bends can be nudged with arrows, and AQF column labels and widths can be edited in the Columns section.'
+      text:'Use the Inspector to edit selected boxes and connections. Straight connector bends can be nudged with arrows, and AQF column labels, widths, and colours can be edited in the Columns section.'
     },
     {
       target:null,placement:'center',last:true,
