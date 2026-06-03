@@ -139,8 +139,9 @@ async function generatePathway(request, env) {
   const editor = validateEditor(body.editor);
   const prompt = cleanLongText(body.prompt || "", 6000);
   const sourceText = cleanLongText(body.text || "", MAX_GENERATE_TEXT_BYTES);
-  if (!prompt && !sourceText) {
-    return json({ error: "Add a prompt or paste document text first" }, 400);
+  const image = validateImageInput(body.image);
+  if (!prompt && !sourceText && !image) {
+    return json({ error: "Add a prompt, upload a document, or upload an image first" }, 400);
   }
 
   const current = body.current && typeof body.current === "object" ? body.current : {};
@@ -151,6 +152,7 @@ async function generatePathway(request, env) {
     title,
     prompt,
     sourceText,
+    image,
     cols
   });
   const map = buildMapFromVal(valResult, cols, editor);
@@ -180,6 +182,23 @@ function buildRecord(body) {
     createdAt: now,
     updatedAt: now
   };
+}
+
+function validateImageInput(image) {
+  if (!image || typeof image !== "object") return null;
+  const mime = String(image.type || "").toLowerCase();
+  const dataUrl = String(image.dataUrl || "");
+  const name = cleanName(image.name || "uploaded image");
+  if (!/^image\/(png|jpe?g|webp)$/.test(mime)) {
+    throw new Error("Only PNG, JPEG, and WebP images are supported");
+  }
+  if (!dataUrl.startsWith(`data:${mime};base64,`)) {
+    throw new Error("Invalid image upload");
+  }
+  if (dataUrl.length > 6_000_000) {
+    throw new Error("Image is too large. Use a smaller screenshot or image.");
+  }
+  return { name, type: mime, dataUrl };
 }
 
 async function writeRecord(env, record) {
@@ -265,13 +284,32 @@ async function callVal(env, input) {
     notes: ["Short caveats about assumptions"]
   };
 
+  const userPayload = {
+    requestedEditor: input.editor,
+    currentTitle: input.title,
+    availableColumns: input.cols.map((c) => ({ id: c.id, label: c.label })),
+    requestedOutputShape: schemaHint,
+    userInstructions: input.prompt,
+    sourceText: input.sourceText,
+    imageInstructions: input.image
+      ? `The uploaded image is named ${input.image.name}. Read visible pathway/table/course information from it and infer the map only from visible content.`
+      : ""
+  };
+
+  const userContent = input.image
+    ? [
+        { type: "text", text: JSON.stringify(userPayload) },
+        { type: "image_url", image_url: { url: input.image.dataUrl } }
+      ]
+    : JSON.stringify(userPayload);
+
   const messages = [
     {
       role: "system",
       content: [
         "You build RMIT pathway editor data from curriculum notes.",
         "Return only a JSON object. Do not include markdown.",
-        "Extract qualifications and pathway connections from the supplied text.",
+        "Extract qualifications and pathway connections from supplied text and any uploaded image.",
         "Use aqfLevel values that match the provided columns where possible.",
         "Use connection style credit for guaranteed entry with credits, guar for guaranteed entry, await for awaiting approval, and nope for not guaranteed.",
         "Do not invent course codes. Leave code empty if unknown."
@@ -279,14 +317,7 @@ async function callVal(env, input) {
     },
     {
       role: "user",
-      content: JSON.stringify({
-        requestedEditor: input.editor,
-        currentTitle: input.title,
-        availableColumns: input.cols.map((c) => ({ id: c.id, label: c.label })),
-        requestedOutputShape: schemaHint,
-        userInstructions: input.prompt,
-        sourceText: input.sourceText
-      })
+      content: userContent
     }
   ];
 

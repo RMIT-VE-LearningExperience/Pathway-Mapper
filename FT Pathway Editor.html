@@ -883,16 +883,49 @@ function applyViewData(d){
   syncCounters();clearSel();rebuildCols();renderNodes();renderEdges();renderLegend();inspect();renderColEditor();
 }
 function currentViewName(){return(document.querySelector('header h1')?.textContent||'Future Technologies view').trim();}
+async function extractPdfText(file){
+  if(file.size>8000000)throw new Error('PDF is too large. Use a smaller PDF or paste the relevant pathway text.');
+  setAiStatus('Reading PDF...');
+  const pdfjsLib=await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs');
+  pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
+  const pdf=await pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
+  const maxPages=Math.min(pdf.numPages,30);
+  const pages=[];
+  for(let i=1;i<=maxPages;i++){
+    const page=await pdf.getPage(i);
+    const content=await page.getTextContent();
+    pages.push(content.items.map(item=>item.str).join(' '));
+  }
+  const suffix=pdf.numPages>maxPages?`\n\n[Only the first ${maxPages} pages were read from ${pdf.numPages} pages.]`:'';
+  return pages.join('\n\n').slice(0,120000)+suffix;
+}
+async function readImageUpload(file){
+  if(file.size>4000000)throw new Error('Image is too large. Use a screenshot under 4 MB.');
+  if(!/^image\/(png|jpe?g|webp)$/i.test(file.type))throw new Error('Use a PNG, JPEG, or WebP image.');
+  const dataUrl=await new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(reader.result);
+    reader.onerror=()=>reject(new Error('Could not read image file.'));
+    reader.readAsDataURL(file);
+  });
+  return{name:file.name,type:file.type,dataUrl};
+}
 async function readAiInput(){
   const prompt=document.getElementById('aiPrompt').value.trim();
   const file=document.getElementById('aiFileIn').files[0];
-  if(!file)return{prompt,text:''};
+  if(!file)return{prompt,text:'',image:null};
   const ext=(file.name.split('.').pop()||'').toLowerCase();
+  if(ext==='pdf'||file.type==='application/pdf'){
+    return{prompt,text:await extractPdfText(file),image:null};
+  }
+  if(file.type.startsWith('image/')){
+    return{prompt,text:'',image:await readImageUpload(file)};
+  }
   if(!['txt','md','csv','json'].includes(ext)){
-    throw new Error('This page can read .txt, .md, .csv, and .json files. Convert Word/PDF/PPT to text first.');
+    throw new Error('This page can read .txt, .md, .csv, .json, .pdf, .png, .jpg, .jpeg, and .webp files.');
   }
   if(file.size>120000)throw new Error('File is too large. Paste the most relevant pathway text instead.');
-  return{prompt,text:await file.text()};
+  return{prompt,text:await file.text(),image:null};
 }
 function setAiStatus(message,isError=false){
   ensureAiModal();
@@ -906,11 +939,11 @@ async function generatePathwayDraft(){
   setAiStatus('Generating draft with VAL...');
   try{
     const input=await readAiInput();
-    if(!input.prompt&&!input.text)throw new Error('Paste pathway notes or choose a text file first.');
+    if(!input.prompt&&!input.text&&!input.image)throw new Error('Paste pathway notes or choose a document/image first.');
     const res=await fetch(`${VIEW_API}/generate-pathway`,{
       method:'POST',
       headers:{'content-type':'application/json'},
-      body:JSON.stringify({editor:EDITOR_ID,title:currentViewName(),prompt:input.prompt,text:input.text,current:currentViewData()})
+      body:JSON.stringify({editor:EDITOR_ID,title:currentViewName(),prompt:input.prompt,text:input.text,image:input.image,current:currentViewData()})
     });
     const result=await res.json();
     if(!res.ok){
@@ -1042,11 +1075,11 @@ function ensureAiModal(){
       <div class="view-head"><h3 id="aiModalTitle">AI Assist</h3><button class="view-close" id="aiClose">Close</button></div>
       <div class="ai-panel" id="aiPanel">
         <textarea id="aiPrompt" placeholder="Paste pathway notes or describe the map to generate."></textarea>
-        <input type="file" id="aiFileIn" accept=".txt,.md,.csv,.json">
+        <input type="file" id="aiFileIn" accept=".txt,.md,.csv,.json,.pdf,.png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp,application/pdf">
         <div class="ai-actions">
           <button class="small-add" id="aiGenerateBtn">Generate draft</button>
         </div>
-        <div class="ai-status" id="aiStatus">Text files supported here. Keep VAL keys in the Worker.</div>
+        <div class="ai-status" id="aiStatus">Supports text, PDF, and image files. Keep VAL keys in the Worker.</div>
       </div>
     </div>
   </div>`);
@@ -1571,7 +1604,7 @@ refreshMapSwitcherViews().catch(()=>{});
     {
       sel:'#aiTopBtn',placement:'bottom',
       title:'AI Assist',
-      text:'Click the VAL icon to open AI Assist. Paste pathway notes or upload a text file, then generate a draft map.'
+      text:'Click the VAL icon to open AI Assist. Paste pathway notes or upload text, PDF, or image files, then generate a draft map.'
     },
     {
       sel:'#viewsGroup',placement:'bottom',
