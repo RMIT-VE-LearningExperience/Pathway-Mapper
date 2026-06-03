@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<!-- saved from url=(0054)file:///Users/E92501/Downloads/ci_pathways_editor.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Creative Industries Pathways — Editor (Compact)</title>
+<style>
+  :root{
+    --bg:#f4f6f9; --panel:#ffffff; --ink:#1d2530; --muted:#6b7785;
+    --line:#dfe5ec; --accent:#d4543a; --col:#e9eef4;
+    --shadow:0 1px 3px rgba(20,30,45,.08),0 6px 18px rgba(20,30,45,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;font-family:"Segoe UI",-apple-system,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg)}
+  /* ---- top bar ---- */
+  header{display:flex;align-items:center;gap:14px;padding:10px 18px;background:var(--panel);
+    border-bottom:1px solid var(--line);position:sticky;top:0;z-index:50;flex-wrap:wrap}
+  header h1{font-size:15px;margin:0;font-weight:700;letter-spacing:.3px}
+  header .badge{font-size:10px;font-weight:700;color:#fff;background:var(--accent);padding:3px 8px;border-radius:20px;letter-spacing:.5px}
+  .spacer{flex:1}
+  button.tool{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);background:#fff;
+    color:var(--ink);padding:7px 12px;border-radius:8px;cursor:pointer;transition:.15s}
+  button.tool:hover{border-color:var(--accent);color:var(--accent)}
+  button.tool.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  button.tool.danger:hover{border-color:#c0392b;color:#c0392b}
+  /* ---- layout ---- */
+  .wrap{display:flex;height:calc(100vh - 53px)}
+  .side{width:280px;background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:16px;flex-shrink:0}
+  .side h2{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:18px 0 8px}
+  .side h2:first-child{margin-top:0}
+  .canvas-host{flex:1;overflow:auto;position:relative;background:
+    linear-gradient(var(--line) 1px,transparent 1px) 0 0/100% 28px,
+    linear-gradient(90deg,var(--line) 1px,transparent 1px) 0 0/28px 100%,var(--bg)}
+  #board{position:relative;width:1800px;height:1500px}
+  /* ---- column headers ---- */
+  .col{position:absolute;top:0;bottom:0;background:var(--col);border-radius:10px;opacity:.55}
+  .col-label{position:absolute;top:10px;font-size:12px;font-weight:700;color:#3a4654;width:100%;text-align:center;letter-spacing:.4px}
+  /* ---- nodes ---- */
+  .node{position:absolute;width:190px;min-height:40px;border-radius:6px;padding:6px 8px;color:#fff;
+    box-shadow:var(--shadow);cursor:grab;font-size:10.5px;line-height:1.25;user-select:none;border:2px solid transparent}
+  .node .title{font-weight:700;display:block}
+  .node .code{font-size:9px;opacity:.85;font-weight:600;display:block;margin-top:2px;letter-spacing:.3px}
+  .node.sel{border-color:#111;box-shadow:0 0 0 3px rgba(0,0,0,.15),var(--shadow)}
+  .node.link-src{border-color:#111;box-shadow:0 0 0 3px var(--accent)}
+  .node .port{position:absolute;width:11px;height:11px;border-radius:50%;background:#fff;border:2px solid #111;
+    top:50%;transform:translateY(-50%);opacity:0;transition:opacity .12s}
+  .node:hover .port{opacity:1}
+  .node .port.l{left:-6px} .node .port.r{right:-6px}
+  /* ---- svg edges ---- */
+  svg#edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}
+  .node{z-index:2}
+  path.edge{fill:none;stroke-width:2.4;cursor:pointer;pointer-events:stroke}
+  path.edge.sel{stroke-width:4}
+  path.ghost{fill:none;stroke:#888;stroke-width:2;stroke-dasharray:6 4;opacity:.5;pointer-events:none}
+  /* line styles */
+  .style-await{stroke-dasharray:none}              /* solid thin handled by width legend */
+  .style-guar{stroke-dasharray:none}
+  .style-credit{stroke-dasharray:none}
+  .style-nope{stroke-dasharray:2 6;stroke-linecap:round}
+  /* ---- inspector fields ---- */
+  label.fld{display:block;font-size:11px;color:var(--muted);font-weight:600;margin:10px 0 4px}
+  input[type=text],select,textarea{width:100%;font:inherit;font-size:12.5px;padding:7px 9px;border:1px solid var(--line);
+    border-radius:7px;background:#fff;color:var(--ink)}
+  textarea{resize:vertical;min-height:46px}
+  .swatch-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+  .sw{width:26px;height:26px;border-radius:6px;cursor:pointer;border:2px solid transparent}
+  .sw.on{border-color:#111}
+  .hint{font-size:11px;color:var(--muted);line-height:1.5;background:#f7f9fb;border:1px solid var(--line);
+    border-radius:8px;padding:9px 11px}
+  .legend-item{display:flex;align-items:center;gap:8px;font-size:11.5px;margin:7px 0;color:var(--ink)}
+  .legend-item.on{font-weight:700}
+  .legend-label{border-radius:4px;padding:1px 3px;outline:none;cursor:text}
+  .legend-label:hover{background:#f0f3f7}
+  .legend-label:focus{background:#e8f0fe;box-shadow:0 0 0 2px #a8c4ff}
+  .legend-swatch{width:40px;height:0;flex-shrink:0}
+  .empty{color:var(--muted);font-size:12px;font-style:italic}
+  .kbd{font-family:monospace;background:#eef1f5;border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:11px}
+  .col-edit{display:flex;align-items:center;gap:6px;margin:5px 0}
+  .col-edit input{flex:1;font:inherit;font-size:12px;padding:5px 7px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+  .col-edit button{font:inherit;font-size:11px;border:1px solid var(--line);background:#fff;color:var(--muted);
+    padding:4px 7px;border-radius:6px;cursor:pointer;flex-shrink:0}
+  .col-edit button:hover{border-color:#c0392b;color:#c0392b}
+  button.small-add{font:inherit;font-size:11.5px;font-weight:600;border:1px solid var(--line);background:#fff;
+    color:var(--ink);padding:6px 10px;border-radius:7px;cursor:pointer;width:100%;margin-top:6px}
+  button.small-add:hover{border-color:var(--accent);color:var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <span class="badge" contenteditable="true" title="Click to edit">515T</span>
+  <h1 contenteditable="true" title="Click to edit">Creative Industries — Pathways Editor</h1>
+  <div class="spacer"></div>
+  <button class="tool" id="addBtn">＋ Add box</button>
+  <button class="tool" id="linkBtn">↳ Link mode</button>
+  <button class="tool danger" id="delBtn">🗑 Delete</button>
+  <button class="tool" id="expJson">⤓ JSON</button>
+  <button class="tool" id="expHtml" style="display:none">⤓ HTML</button>
+  <button class="tool" id="expPdf">⤓ PDF</button>
+  <button class="tool" id="expPng">⤓ PNG</button>
+  <button class="tool" id="expSlide">⤓ Slide</button>
+  <button class="tool" id="impBtn">⤒ Import</button>
+  <input type="file" id="fileIn" accept=".json" hidden="">
+</header>
+
+<div class="wrap">
+  <aside class="side">
+    <h2>Inspector</h2>
+    <div id="inspector"><p class="empty">Select a box or a connection to edit it.</p></div>
+
+    <h2>Connection legend</h2>
+    <div id="legend"><div class="legend-item">
+      <svg class="legend-swatch" height="14" viewBox="0 0 40 14">
+        <line x1="0" y1="7" x2="40" y2="7" stroke="#333" stroke-width="2" stroke-linecap="butt" stroke-dasharray="6 5"></line>
+      </svg><span>Awaiting approval — guaranteed entry on completion</span></div><div class="legend-item">
+      <svg class="legend-swatch" height="14" viewBox="0 0 40 14">
+        <line x1="0" y1="7" x2="40" y2="7" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-dasharray="1 4"></line>
+      </svg><span>Guaranteed entry on completion</span></div><div class="legend-item">
+      <svg class="legend-swatch" height="14" viewBox="0 0 40 14">
+        <line x1="0" y1="7" x2="40" y2="7" stroke="#333" stroke-width="3.4" stroke-linecap="butt"></line>
+      </svg><span>Guaranteed entry on completion with credits</span></div><div class="legend-item">
+      <svg class="legend-swatch" height="14" viewBox="0 0 40 14">
+        <line x1="0" y1="7" x2="40" y2="7" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-dasharray="2 6"></line>
+      </svg><span>Not guaranteed — credits if applicant accepted</span></div></div>
+
+    <h2>Options</h2>
+    <label class="fld">Line routing</label>
+    <select id="lineRouting">
+      <option value="curved" selected>Curved</option>
+      <option value="straight">Straight</option>
+    </select>
+
+    <h2>Columns</h2>
+    <div id="colEditor"></div>
+    <button class="small-add" id="addColBtn">＋ Add column</button>
+
+    <h2>How to use</h2>
+    <div class="hint">
+      • Click the <b>badge</b> or <b>title</b> in the header to rename them.<br>
+      • <b>Drag</b> a box to reposition it on the canvas.<br>
+      • <b>Link mode</b> → hover a box → drag from its dot to another box.<br>
+      • Click a box or line to edit its properties here.<br>
+      • <span class="kbd">Del</span> or the Delete button removes the selection.<br>
+      • <b>Export PDF</b> captures the full map with your title.
+    </div>
+  </aside>
+
+  <div class="canvas-host" id="host">
+    <div id="board">
+      <div class="col" style="left: 20px; width: 200px;"></div><div class="col" style="left: 240px; width: 230px;"></div><div class="col" style="left: 490px; width: 230px;"></div><div class="col" style="left: 740px; width: 230px;"></div><div class="col" style="left: 990px; width: 230px;"></div><svg id="edges"><path d="M 439 179 C 472 179, 472 107, 505 107" class="edge" stroke="#3f9c54" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 439 179 C 472 179, 472 251, 505 251" class="edge" stroke="#4aa1a6" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 689 107 C 722 107, 722 113.5, 755 113.5" class="edge" stroke="#3f9c54" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 939 113.5 C 972 113.5, 972 113.5, 1005 113.5" class="edge" stroke="#3f9c54" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 689 251 C 722 251, 722 257.5, 755 257.5" class="edge" stroke="#4aa1a6" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 939 257.5 C 972 257.5, 972 257.5, 1005 257.5" class="edge" stroke="#4aa1a6" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 439 401.5 C 472 401.5, 472 395, 505 395" class="edge" stroke="#3aa0d6" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 689 395 C 722 395, 722 401.5, 755 401.5" class="edge" stroke="#3aa0d6" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 939 401.5 C 972 401.5, 972 401.5, 1005 401.5" class="edge" stroke="#3aa0d6" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 689 395 C 847 395, 847 401.5, 1005 401.5" class="edge" stroke="#3aa0d6" stroke-width="2" stroke-linecap="butt" stroke-dasharray="6 5"></path><path d="M 219 545.5 C 237 545.5, 237 689.5, 255 689.5" class="edge" stroke="#e07a52" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 439 545.5 C 472 545.5, 472 611, 505 611" class="edge" stroke="#e07a52" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 439 689.5 C 472 689.5, 472 611, 505 611" class="edge" stroke="#e07a52" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 689 611 C 722 611, 722 611, 755 611" class="edge" stroke="#e07a52" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 939 611 C 972 611, 972 539, 1005 539" class="edge" stroke="#e07a52" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 939 611 C 972 611, 972 611, 1005 611" class="edge" stroke="#e07a52" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 939 611 C 972 611, 972 689.5, 1005 689.5" class="edge" stroke="#e07a52" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 939 611 C 972 611, 972 755, 1005 755" class="edge" stroke="#e07a52" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 439 905.5 C 472 905.5, 472 905.5, 505 905.5" class="edge" stroke="#3aa0d6" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 439 905.5 C 472 905.5, 472 1049.5, 505 1049.5" class="edge" stroke="#3aa0d6" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 439 905.5 C 472 905.5, 472 1187, 505 1187" class="edge" stroke="#3aa0d6" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 439 905.5 C 472 905.5, 472 1337.5, 505 1337.5" class="edge" stroke="#f06ba8" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 439 905.5 C 472 905.5, 472 1475, 505 1475" class="edge" stroke="#f06ba8" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 689 905.5 C 722 905.5, 722 913, 755 913" class="edge" stroke="#3aa0d6" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 689 1049.5 C 722 1049.5, 722 913, 755 913" class="edge" stroke="#3aa0d6" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 689 1187 C 722 1187, 722 1049.5, 755 1049.5" class="edge" stroke="#3aa0d6" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 939 913 C 972 913, 972 905.5, 1005 905.5" class="edge" stroke="#3aa0d6" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 939 913 C 972 913, 972 1043, 1005 1043" class="edge" stroke="#3aa0d6" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 939 1049.5 C 972 1049.5, 972 905.5, 1005 905.5" class="edge" stroke="#3aa0d6" stroke-width="2" stroke-linecap="butt" stroke-dasharray="6 5"></path><path d="M 689 1337.5 C 722 1337.5, 722 1331, 755 1331" class="edge" stroke="#f06ba8" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 689 1475 C 722 1475, 722 1331, 755 1331" class="edge" stroke="#f06ba8" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 939 1331 C 972 1331, 972 1259, 1005 1259" class="edge" stroke="#f06ba8" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 439 1409.5 C 597 1409.5, 597 1481.5, 755 1481.5" class="edge" stroke="#d6202a" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 439 1409.5 C 597 1409.5, 597 1625.5, 755 1625.5" class="edge" stroke="#d6202a" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 939 1481.5 C 972 1481.5, 972 1403, 1005 1403" class="edge" stroke="#d6202a" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 939 1625.5 C 972 1625.5, 972 1481.5, 1005 1481.5" class="edge" stroke="#d6202a" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 939 1625.5 C 972 1625.5, 972 1619, 1005 1619" class="edge" stroke="#d6202a" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 439 1697.5 C 472 1697.5, 472 1691, 505 1691" class="edge" stroke="#3f9c54" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 689 1691 C 847 1691, 847 1691, 1005 1691" class="edge" stroke="#3f9c54" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 689 1835 C 722 1835, 722 1835, 755 1835" class="edge" stroke="#2e3b8c" stroke-width="3.4" stroke-linecap="butt"></path><path d="M 939 1835 C 972 1835, 972 1835, 1005 1835" class="edge" stroke="#2e3b8c" stroke-width="3.4" stroke-linecap="butt"></path></svg>
+    <div class="col-label" style="left: 20px; width: 200px;">AQF Level 3</div><div class="col-label" style="left: 240px; width: 230px;">AQF Level 4</div><div class="col-label" style="left: 490px; width: 230px;">AQF Level 5</div><div class="col-label" style="left: 740px; width: 230px;">AQF Level 6</div><div class="col-label" style="left: 990px; width: 230px;">AQF Level 7</div><div class="node" data-id="n1" style="left: 35px; top: 512px; background: rgb(224, 122, 82); width: 184px;"><span class="title">Certificate III Clothing &amp; Textile prod.</span><span class="code">C3406</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n2" style="left: 255px; top: 152px; background: rgb(63, 156, 84); width: 184px;"><span class="title">Certificate IV Design</span><span class="code">C4414</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n3" style="left: 255px; top: 368px; background: rgb(58, 160, 214); width: 184px;"><span class="title">Certificate IV Interior Decoration</span><span class="code">C4402</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n4" style="left: 255px; top: 512px; background: rgb(224, 122, 82); width: 184px;"><span class="title">Certificate IV Custom-Made Footwear</span><span class="code">C4389</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n5" style="left: 255px; top: 656px; background: rgb(224, 122, 82); width: 184px;"><span class="title">Certificate IV Textile Design and Technology</span><span class="code">C4434</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n6" style="left: 255px; top: 872px; background: rgb(58, 160, 214); width: 184px;"><span class="title">Certificate IV Screen and Media</span><span class="code">C4422</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n7" style="left: 255px; top: 1376px; background: rgb(214, 32, 42); width: 184px;"><span class="title">Certificate IV Professional Writing &amp; Editing</span><span class="code">C4404</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n8" style="left: 255px; top: 1664px; background: rgb(63, 156, 84); width: 184px;"><span class="title">Certificate IV Photo &amp; Digit Image</span><span class="code">C4415</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n10" style="left: 505px; top: 80px; background: rgb(63, 156, 84); width: 184px;"><span class="title">Diploma Graphic Design</span><span class="code">C5409</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n11" style="left: 505px; top: 224px; background: rgb(74, 161, 166); width: 184px;"><span class="title">Diploma Product Design</span><span class="code">C5382</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n12" style="left: 505px; top: 368px; background: rgb(58, 160, 214); width: 184px;"><span class="title">Diploma Interior Design</span><span class="code">C5396</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n13" style="left: 505px; top: 584px; background: rgb(224, 122, 82); width: 184px;"><span class="title">Diploma Fashion Styling</span><span class="code">C5401</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n14" style="left: 505px; top: 872px; background: rgb(58, 160, 214); width: 184px;"><span class="title">Diploma Screen &amp; Media (Games)</span><span class="code">C5413</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n15" style="left: 505px; top: 1016px; background: rgb(58, 160, 214); width: 184px;"><span class="title">Diploma Screen &amp; Media (Content)</span><span class="code">C5412</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n16" style="left: 505px; top: 1160px; background: rgb(58, 160, 214); width: 184px;"><span class="title">Diploma Screen &amp; Media</span><span class="code">C5421</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n17" style="left: 505px; top: 1304px; background: rgb(240, 107, 168); width: 184px;"><span class="title">Diploma Live Production &amp; Tech services</span><span class="code">C5408</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n18" style="left: 505px; top: 1448px; background: rgb(240, 107, 168); width: 184px;"><span class="title">Diploma Music Industry</span><span class="code">C5410</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n19" style="left: 505px; top: 1664px; background: rgb(63, 156, 84); width: 184px;"><span class="title">Diploma Photo &amp; Digit Image</span><span class="code">C5411</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n20" style="left: 505px; top: 1808px; background: rgb(46, 59, 140); width: 184px;"><span class="title">Diploma Visual Arts</span><span class="code">C5414</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n30" style="left: 755px; top: 80px; background: rgb(63, 156, 84); width: 184px;"><span class="title">Associate Degree Graphic Design</span><span class="code">AD022</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n31" style="left: 755px; top: 224px; background: rgb(74, 161, 166); width: 184px;"><span class="title">Associate Degree Furniture Design</span><span class="code">AD007</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n32" style="left: 755px; top: 368px; background: rgb(58, 160, 214); width: 184px;"><span class="title">Associate Degree Interior Design</span><span class="code">AD020</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n33" style="left: 755px; top: 584px; background: rgb(224, 122, 82); width: 184px;"><span class="title">Associate Degree in Fashion</span><span class="code">AD030</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n34" style="left: 755px; top: 872px; background: rgb(58, 160, 214); width: 184px;"><span class="title">Advanced Diploma Screen &amp; Media (Content creation &amp; design)</span><span class="code">C6173</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n35" style="left: 755px; top: 1016px; background: rgb(58, 160, 214); width: 184px;"><span class="title">Associate Degree Screen &amp; Media Production</span><span class="code">AD017</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n36" style="left: 755px; top: 1304px; background: rgb(240, 107, 168); width: 184px;"><span class="title">Advanced Diploma Music</span><span class="code">C6171</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n37" style="left: 755px; top: 1448px; background: rgb(214, 32, 42); width: 184px;"><span class="title">Advanced Diploma Professional Screen Writing</span><span class="code">C6180</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n38" style="left: 755px; top: 1592px; background: rgb(214, 32, 42); width: 184px;"><span class="title">Associate Degree Professional Writing &amp; Editing</span><span class="code">AD016</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n39" style="left: 755px; top: 1808px; background: rgb(46, 59, 140); width: 184px;"><span class="title">Advanced Diploma Visual Art</span><span class="code">C6174</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n50" style="left: 1005px; top: 80px; background: rgb(63, 156, 84); width: 184px;"><span class="title">Bachelor Design (Communication Design)</span><span class="code">BP115</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n51" style="left: 1005px; top: 224px; background: rgb(74, 161, 166); width: 184px;"><span class="title">Bachelor Design (Industrial Design)</span><span class="code">BH104P15</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n52" style="left: 1005px; top: 368px; background: rgb(58, 160, 214); width: 184px;"><span class="title">Bachelor Design (Interior Design)</span><span class="code">BH115</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n53" style="left: 1005px; top: 512px; background: rgb(224, 122, 82); width: 184px;"><span class="title">Bachelor Fashion (Design)</span><span class="code">BP328</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n54" style="left: 1005px; top: 584px; background: rgb(224, 122, 82); width: 184px;"><span class="title">Bachelor Fashion (Enterprise)</span><span class="code">BP327</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n55" style="left: 1005px; top: 656px; background: rgb(224, 122, 82); width: 184px;"><span class="title">Bachelor Fashion &amp; Textiles Sustainable innovation</span><span class="code">BP326</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n56" style="left: 1005px; top: 728px; background: rgb(224, 122, 82); width: 184px;"><span class="title">Bachelor Textiles (Design)</span><span class="code">BP121</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n57" style="left: 1005px; top: 872px; background: rgb(58, 160, 214); width: 184px;"><span class="title">Bachelor Design (Digital Media)</span><span class="code">BP309</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n58" style="left: 1005px; top: 1016px; background: rgb(58, 160, 214); width: 184px;"><span class="title">Bachelor Design (Games)</span><span class="code">BP214P12</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n59" style="left: 1005px; top: 1232px; background: rgb(240, 107, 168); width: 184px;"><span class="title">Bachelor Arts (Music Industry)</span><span class="code">BP047</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n60" style="left: 1005px; top: 1376px; background: rgb(214, 32, 42); width: 184px;"><span class="title">Bachelor Comms (Media)</span><span class="code">BP221</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n61" style="left: 1005px; top: 1448px; background: rgb(214, 32, 42); width: 184px;"><span class="title">Bachelor Arts (Creative Writing)</span><span class="code">BP257</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n62" style="left: 1005px; top: 1592px; background: rgb(214, 32, 42); width: 184px;"><span class="title">Bachelor Comms (Journalism)</span><span class="code">BP220</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n63" style="left: 1005px; top: 1664px; background: rgb(63, 156, 84); width: 184px;"><span class="title">Bachelor Arts (Photography)</span><span class="code">BP117</span>
+      <span class="port l"></span><span class="port r"></span></div><div class="node" data-id="n64" style="left: 1005px; top: 1808px; background: rgb(46, 59, 140); width: 184px;"><span class="title">Bachelor Arts (Fine Art)</span><span class="code">BP201P16</span>
+      <span class="port l"></span><span class="port r"></span></div></div>
+  </div>
+</div>
+
+<script>
+const SVGNS="http://www.w3.org/2000/svg";
+const board=document.getElementById('board');
+const svg=document.getElementById('edges');
+const host=document.getElementById('host');
+
+// ---- AQF columns ----
+const COLS=[
+  {id:3,label:"AQF Level 3",x:20,w:190},
+  {id:4,label:"AQF Level 4",x:225,w:210},
+  {id:5,label:"AQF Level 5",x:450,w:210},
+  {id:6,label:"AQF Level 6",x:675,w:210},
+  {id:7,label:"AQF Level 7",x:900,w:210},
+];
+
+// ---- line styles (status) ----
+const STYLES={
+  await:{label:"Awaiting approval — guaranteed entry on completion", w:2,   dash:"6 5", cap:"butt"},
+  guar :{label:"Guaranteed entry on completion",                    w:2,   dash:"1 4", cap:"round"},
+  credit:{label:"Guaranteed entry on completion with credits",      w:3.4, dash:"none",cap:"butt"},
+  nope :{label:"Not guaranteed — credits if applicant accepted",    w:2,   dash:"2 6", cap:"round"},
+};
+
+// ---- palette from the source diagram ----
+const PALETTE=["#3f9c54","#4aa1a6","#e07a52","#d4543a","#3aa0d6","#2c7fbf",
+  "#f06ba8","#d6202a","#3f9c54","#2e3b8c","#7d3fa0","#c0392b","#1b2a4a","#8a8f3a"];
+
+let nodes=[], edges=[], nextN=1, nextE=1;
+function syncCounters(){
+  nextN=nodes.reduce((m,n)=>Math.max(m,parseInt(n.id.replace(/\D/g,''))||0),0)+1;
+  nextE=edges.reduce((m,e)=>Math.max(m,parseInt(e.id.replace(/\D/g,''))||0),0)+1;
+}
+let selNode=null, selEdge=null;
+let linkMode=false, linkFrom=null;
+let lineRouting='curved';
+
+// ===== seed: Creative Industries map =====
+function seed(){
+  const def=(id,title,code,col,row,color)=>({id,title,code,col,color,
+    x:COLS.find(c=>c.id===col).x+15, y:60+row*46, w:184});
+  // helper to place by column index ordering — we lay out top-to-bottom per discipline cluster
+  let r;
+  nodes=[
+    // ---- Design (green) ----
+    def('n1','Certificate III Clothing & Textile prod.','C3406',3,6,'#e07a52'),
+    def('n2','Certificate IV Design','C4414',4,1,'#3f9c54'),
+    def('n3','Certificate IV Interior Decoration','C4402',4,4,'#3aa0d6'),
+    def('n4','Certificate IV Custom-Made Footwear','C4389',4,6,'#e07a52'),
+    def('n5','Certificate IV Textile Design and Technology','C4434',4,8,'#e07a52'),
+    def('n6','Certificate IV Screen and Media','C4422',4,11,'#3aa0d6'),
+    def('n7','Certificate IV Professional Writing & Editing','C4404',4,18,'#d6202a'),
+    def('n8','Certificate IV Photo & Digit Image','C4415',4,22,'#3f9c54'),
+
+    def('n10','Diploma Graphic Design','C5409',5,0,'#3f9c54'),
+    def('n11','Diploma Product Design','C5382',5,2,'#4aa1a6'),
+    def('n12','Diploma Interior Design','C5396',5,4,'#3aa0d6'),
+    def('n13','Diploma Fashion Styling','C5401',5,7,'#e07a52'),
+    def('n14','Diploma Screen & Media (Games)','C5413',5,11,'#3aa0d6'),
+    def('n15','Diploma Screen & Media (Content)','C5412',5,13,'#3aa0d6'),
+    def('n16','Diploma Screen & Media','C5421',5,15,'#3aa0d6'),
+    def('n17','Diploma Live Production & Tech services','C5408',5,17,'#f06ba8'),
+    def('n18','Diploma Music Industry','C5410',5,19,'#f06ba8'),
+    def('n19','Diploma Photo & Digit Image','C5411',5,22,'#3f9c54'),
+    def('n20','Diploma Visual Arts','C5414',5,24,'#2e3b8c'),
+
+    def('n30','Associate Degree Graphic Design','AD022',6,0,'#3f9c54'),
+    def('n31','Associate Degree Furniture Design','AD007',6,2,'#4aa1a6'),
+    def('n32','Associate Degree Interior Design','AD020',6,4,'#3aa0d6'),
+    def('n33','Associate Degree in Fashion','AD030',6,7,'#e07a52'),
+    def('n34','Advanced Diploma Screen & Media (Content creation & design)','C6173',6,11,'#3aa0d6'),
+    def('n35','Associate Degree Screen & Media Production','AD017',6,13,'#3aa0d6'),
+    def('n36','Advanced Diploma Music','C6171',6,17,'#f06ba8'),
+    def('n37','Advanced Diploma Professional Screen Writing','C6180',6,19,'#d6202a'),
+    def('n38','Associate Degree Professional Writing & Editing','AD016',6,21,'#d6202a'),
+    def('n39','Advanced Diploma Visual Art','C6174',6,24,'#2e3b8c'),
+
+    def('n50','Bachelor Design (Communication Design)','BP115',7,0,'#3f9c54'),
+    def('n51','Bachelor Design (Industrial Design)','BH104P15',7,2,'#4aa1a6'),
+    def('n52','Bachelor Design (Interior Design)','BH115',7,4,'#3aa0d6'),
+    def('n53','Bachelor Fashion (Design)','BP328',7,6,'#e07a52'),
+    def('n54','Bachelor Fashion (Enterprise)','BP327',7,7,'#e07a52'),
+    def('n55','Bachelor Fashion & Textiles Sustainable innovation','BP326',7,8,'#e07a52'),
+    def('n56','Bachelor Textiles (Design)','BP121',7,9,'#e07a52'),
+    def('n57','Bachelor Design (Digital Media)','BP309',7,11,'#3aa0d6'),
+    def('n58','Bachelor Design (Games)','BP214P12',7,13,'#3aa0d6'),
+    def('n59','Bachelor Arts (Music Industry)','BP047',7,16,'#f06ba8'),
+    def('n60','Bachelor Comms (Media)','BP221',7,18,'#d6202a'),
+    def('n61','Bachelor Arts (Creative Writing)','BP257',7,19,'#d6202a'),
+    def('n62','Bachelor Comms (Journalism)','BP220',7,21,'#d6202a'),
+    def('n63','Bachelor Arts (Photography)','BP117',7,22,'#3f9c54'),
+    def('n64','Bachelor Arts (Fine Art)','BP201P16',7,24,'#2e3b8c'),
+  ];
+  syncCounters();
+  // ---- edges (representative connections from the diagram) ----
+  const E=(a,b,style,color)=>({id:'e'+(nextE++),from:a,to:b,style,color});
+  edges=[
+    E('n2','n10','credit','#3f9c54'), E('n2','n11','credit','#4aa1a6'),
+    E('n10','n30','credit','#3f9c54'), E('n30','n50','credit','#3f9c54'),
+    E('n11','n31','credit','#4aa1a6'), E('n31','n51','credit','#4aa1a6'),
+    E('n3','n12','credit','#3aa0d6'), E('n12','n32','credit','#3aa0d6'), E('n32','n52','credit','#3aa0d6'),
+    E('n12','n52','await','#3aa0d6'),
+    E('n1','n5','credit','#e07a52'),
+    E('n4','n13','credit','#e07a52'), E('n5','n13','credit','#e07a52'),
+    E('n13','n33','credit','#e07a52'),
+    E('n33','n53','credit','#e07a52'), E('n33','n54','credit','#e07a52'),
+    E('n33','n55','credit','#e07a52'), E('n33','n56','credit','#e07a52'),
+    E('n6','n14','credit','#3aa0d6'), E('n6','n15','credit','#3aa0d6'), E('n6','n16','credit','#3aa0d6'),
+    E('n6','n17','credit','#f06ba8'), E('n6','n18','credit','#f06ba8'),
+    E('n14','n34','credit','#3aa0d6'), E('n15','n34','credit','#3aa0d6'), E('n16','n35','credit','#3aa0d6'),
+    E('n34','n57','credit','#3aa0d6'), E('n34','n58','credit','#3aa0d6'),
+    E('n35','n57','await','#3aa0d6'),
+    E('n17','n36','credit','#f06ba8'), E('n18','n36','credit','#f06ba8'),
+    E('n36','n59','credit','#f06ba8'),
+    E('n7','n37','credit','#d6202a'), E('n7','n38','credit','#d6202a'),
+    E('n37','n60','credit','#d6202a'), E('n38','n61','credit','#d6202a'), E('n38','n62','credit','#d6202a'),
+    E('n8','n19','credit','#3f9c54'), E('n19','n63','credit','#3f9c54'),
+    E('n20','n39','credit','#2e3b8c'), E('n39','n64','credit','#2e3b8c'),
+  ];
+}
+
+// ===== render columns =====
+function renderCols(){
+  COLS.forEach(c=>{
+    const d=document.createElement('div');
+    d.className='col'; d.style.left=c.x+'px'; d.style.width=c.w+'px';
+    board.insertBefore(d,svg);
+    const l=document.createElement('div');
+    l.className='col-label'; l.style.left=c.x+'px'; l.style.width=c.w+'px'; l.textContent=c.label;
+    board.appendChild(l);
+  });
+}
+
+// ===== render nodes =====
+function renderNodes(){
+  document.querySelectorAll('.node').forEach(n=>n.remove());
+  nodes.forEach(n=>{
+    const el=document.createElement('div');
+    el.className='node'; el.dataset.id=n.id;
+    el.style.left=n.x+'px'; el.style.top=n.y+'px';
+    el.style.background=n.color; el.style.width=(n.w||184)+'px';
+    el.innerHTML=`<span class="title">${esc(n.title)}</span>${n.code?`<span class="code">${esc(n.code)}</span>`:''}
+      <span class="port l"></span><span class="port r"></span>`;
+    if(selNode===n.id) el.classList.add('sel');
+    if(linkFrom===n.id) el.classList.add('link-src');
+    board.appendChild(el);
+    attachNode(el,n);
+  });
+}
+
+// ===== edges =====
+function nodeRect(n){return{x:n.x,y:n.y,w:(n.w||184),h:document.querySelector(`.node[data-id="${n.id}"]`)?.offsetHeight||54};}
+function renderEdges(){
+  svg.innerHTML='';
+  edges.forEach(e=>{
+    const a=nodes.find(n=>n.id===e.from), b=nodes.find(n=>n.id===e.to);
+    if(!a||!b) return;
+    const ra=nodeRect(a), rb=nodeRect(b);
+    const x1=ra.x+ra.w, y1=ra.y+ra.h/2, x2=rb.x, y2=rb.y+rb.h/2;
+    const mx=(x1+x2)/2;
+    const d=lineRouting==='straight'
+      ?`M ${x1} ${y1} L ${mx} ${y1} L ${mx} ${y2} L ${x2} ${y2}`
+      :`M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
+    const p=document.createElementNS(SVGNS,'path');
+    const st=STYLES[e.style]||STYLES.guar;
+    p.setAttribute('d',d); p.setAttribute('class','edge');
+    p.setAttribute('stroke',e.color||'#555');
+    p.setAttribute('stroke-width',st.w);
+    p.setAttribute('stroke-linecap',st.cap);
+    if(st.dash!=='none') p.setAttribute('stroke-dasharray',st.dash);
+    if(selEdge===e.id) p.classList.add('sel');
+    p.addEventListener('click',ev=>{ev.stopPropagation();selectEdge(e.id);});
+    svg.appendChild(p);
+  });
+}
+
+// ===== drag / link state (single global handler, not per-render) =====
+let drag=null, dragNode=null, dragEl=null;
+
+function boardXY(ev){
+  const r=host.getBoundingClientRect();
+  return{ x:ev.clientX - r.left + host.scrollLeft,
+          y:ev.clientY - r.top  + host.scrollTop };
+}
+
+window.addEventListener('mousemove',ev=>{
+  if(!drag) return;
+  const p=boardXY(ev);
+  dragNode.x=Math.round((p.x-drag.dx)/14)*14;
+  dragNode.y=Math.round((p.y-drag.dy)/14)*14;
+  dragEl.style.left=dragNode.x+'px'; dragEl.style.top=dragNode.y+'px';
+  renderEdges();
+});
+window.addEventListener('mouseup',()=>{
+  if(drag){drag=null;if(dragEl)dragEl.style.cursor='grab';dragEl=null;dragNode=null;}
+});
+
+// ===== ghost link line =====
+let ghostLine=null;
+function ensureGhost(){
+  if(!ghostLine){
+    ghostLine=document.createElementNS(SVGNS,'path');
+    ghostLine.setAttribute('class','ghost');
+  }
+}
+host.addEventListener('mousemove',ev=>{
+  if(!linkFrom){if(ghostLine&&ghostLine.parentNode)ghostLine.remove();return;}
+  ensureGhost();
+  const src=nodes.find(n=>n.id===linkFrom);
+  if(!src)return;
+  const ra=nodeRect(src);
+  const x1=ra.x+ra.w, y1=ra.y+ra.h/2;
+  const p=boardXY(ev);
+  const x2=p.x, y2=p.y;
+  const mx=(x1+x2)/2;
+  const d=lineRouting==='straight'
+    ?`M ${x1} ${y1} L ${mx} ${y1} L ${mx} ${y2} L ${x2} ${y2}`
+    :`M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
+  ghostLine.setAttribute('d',d);
+  if(!ghostLine.parentNode) svg.appendChild(ghostLine);
+});
+host.addEventListener('mouseup',()=>{
+  if(ghostLine&&ghostLine.parentNode)ghostLine.remove();
+});
+
+function attachNode(el,n){
+  el.addEventListener('mousedown',ev=>{
+    if(ev.target.classList.contains('port')) return;
+    if(linkMode) return;
+    const p=boardXY(ev);
+    dragNode=n;
+    selectNode(n.id);
+    // Re-acquire el after renderNodes rebuilt the DOM
+    dragEl=document.querySelector(`.node[data-id="${n.id}"]`);
+    const p2=boardXY(ev);
+    drag={dx:p2.x-n.x, dy:p2.y-n.y};
+    dragEl.style.cursor='grabbing';
+  });
+  el.addEventListener('click',ev=>{ev.stopPropagation();});
+  // link ports
+  el.querySelectorAll('.port').forEach(port=>{
+    port.addEventListener('mousedown',ev=>{
+      ev.stopPropagation();
+      if(!linkMode){setLink(true);}
+      linkFrom=n.id; renderNodes();
+    });
+  });
+  el.addEventListener('mouseup',ev=>{
+    if(linkFrom && linkFrom!==n.id){
+      edges.push({id:'e'+(nextE++),from:linkFrom,to:n.id,style:'guar',color:n.color});
+      linkFrom=null; setLink(false); renderNodes(); renderEdges();
+    }
+  });
+}
+
+// ===== selection / inspector =====
+function selectNode(id){selNode=id;selEdge=null;renderNodes();renderEdges();inspect();}
+function selectEdge(id){selEdge=id;selNode=null;renderNodes();renderEdges();inspect();}
+function clearSel(){selNode=null;selEdge=null;linkFrom=null;renderNodes();renderEdges();inspect();}
+
+function inspect(){
+  const box=document.getElementById('inspector');
+  if(selNode){
+    const n=nodes.find(x=>x.id===selNode);
+    box.innerHTML=`
+      <label class="fld">Title</label><textarea id="f-title">${esc(n.title)}</textarea>
+      <label class="fld">Code</label><input type="text" id="f-code" value="${esc(n.code||'')}">
+      <label class="fld">AQF Level</label>
+      <select id="f-col">${COLS.map(c=>`<option value="${c.id}" ${c.id===n.col?'selected':''}>${c.label}</option>`).join('')}</select>
+      <label class="fld">Colour</label>
+      <div class="swatch-row">${PALETTE.map(c=>`<div class="sw ${c===n.color?'on':''}" data-c="${c}" style="background:${c}"></div>`).join('')}</div>`;
+    document.getElementById('f-title').oninput=e=>{n.title=e.target.value;renderNodes();renderEdges();};
+    document.getElementById('f-code').oninput=e=>{n.code=e.target.value;renderNodes();renderEdges();};
+    document.getElementById('f-col').onchange=e=>{n.col=+e.target.value;n.x=COLS.find(c=>c.id===n.col).x+15;renderNodes();renderEdges();};
+    box.querySelectorAll('.sw').forEach(s=>s.onclick=()=>{n.color=s.dataset.c;renderNodes();renderEdges();inspect();});
+  }else if(selEdge){
+    const e=edges.find(x=>x.id===selEdge);
+    const a=nodes.find(n=>n.id===e.from), b=nodes.find(n=>n.id===e.to);
+    box.innerHTML=`
+      <div class="hint">${esc(a?.title||'?')} → ${esc(b?.title||'?')}</div>
+      <label class="fld">Connection type</label>
+      <select id="e-style">${Object.entries(STYLES).map(([k,v])=>`<option value="${k}" ${k===e.style?'selected':''}>${v.label}</option>`).join('')}</select>
+      <label class="fld">Colour</label>
+      <div class="swatch-row">${PALETTE.map(c=>`<div class="sw ${c===e.color?'on':''}" data-c="${c}" style="background:${c}"></div>`).join('')}</div>`;
+    document.getElementById('e-style').onchange=ev=>{e.style=ev.target.value;renderEdges();};
+    box.querySelectorAll('.sw').forEach(s=>s.onclick=()=>{e.color=s.dataset.c;renderEdges();inspect();});
+  }else{
+    box.innerHTML='<p class="empty">Select a box or a connection to edit it.</p>';
+  }
+}
+
+// ===== legend =====
+function renderLegend(){
+  const L=document.getElementById('legend');
+  L.innerHTML=Object.entries(STYLES).map(([k,v])=>{
+    const dash=v.dash==='none'?'':`stroke-dasharray="${v.dash}"`;
+    return `<div class="legend-item" data-style="${k}">
+      <svg class="legend-swatch" height="14" viewBox="0 0 40 14">
+        <line x1="0" y1="7" x2="40" y2="7" stroke="#333" stroke-width="${v.w}" stroke-linecap="${v.cap}" ${dash}/>
+      </svg><span class="legend-label" contenteditable="true" title="Click to edit">${v.label}</span></div>`;
+  }).join('');
+  L.querySelectorAll('.legend-label').forEach(span=>{
+    const key=span.closest('[data-style]').dataset.style;
+    span.addEventListener('input',()=>{
+      STYLES[key].label=span.textContent.trim()||STYLES[key].label;
+      const opt=document.querySelector(`#e-style option[value="${key}"]`);
+      if(opt) opt.textContent=STYLES[key].label;
+    });
+    span.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();span.blur();}});
+  });
+}
+
+// ===== toolbar actions =====
+document.getElementById('addBtn').onclick=()=>{
+  const n={id:'n'+(nextN++),title:'New qualification',code:'',col:5,
+    x:COLS[2].x+15,y:host.scrollTop+120,w:184,color:PALETTE[0]};
+  nodes.push(n); renderNodes(); renderEdges(); selectNode(n.id);
+};
+function setLink(on){linkMode=on;linkFrom=null;document.getElementById('linkBtn').classList.toggle('active',on);
+  host.style.cursor=on?'crosshair':'';}
+document.getElementById('linkBtn').onclick=()=>setLink(!linkMode);
+document.getElementById('delBtn').onclick=del;
+function del(){
+  if(selNode){nodes=nodes.filter(n=>n.id!==selNode);edges=edges.filter(e=>e.from!==selNode&&e.to!==selNode);selNode=null;}
+  else if(selEdge){edges=edges.filter(e=>e.id!==selEdge);selEdge=null;}
+  renderNodes();renderEdges();inspect();
+}
+document.addEventListener('keydown',e=>{if((e.key==='Delete'||e.key==='Backspace')&&(selNode||selEdge)){
+  if(document.activeElement.tagName==='INPUT'||document.activeElement.tagName==='TEXTAREA')return;del();}
+  if(e.key==='Escape')clearSel();});
+host.addEventListener('click',()=>clearSel());
+
+// ===== export / import =====
+function download(name,content,type){
+  const b=new Blob([content],{type});const u=URL.createObjectURL(b);
+  const a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u);
+}
+document.getElementById('expJson').onclick=()=>{
+  download('ci_pathways.json',JSON.stringify({cols:COLS,styles:STYLES,nodes,edges},null,2),'application/json');
+};
+document.getElementById('impBtn').onclick=()=>document.getElementById('fileIn').click();
+document.getElementById('fileIn').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{try{const d=JSON.parse(r.result);nodes=d.nodes||[];edges=d.edges||[];
+    syncCounters();clearSel();renderNodes();renderEdges();
+  }catch(err){alert('Invalid JSON');}};r.readAsText(f);
+};
+document.getElementById('expHtml').onclick=exportHTML;
+function exportHTML(){
+  // static, view-only standalone HTML snapshot
+  const w=2000,h=2400;
+  let svgEdges='';
+  edges.forEach(e=>{const a=nodes.find(n=>n.id===e.from),b=nodes.find(n=>n.id===e.to);if(!a||!b)return;
+    const ra=nodeRect(a),rb=nodeRect(b);const x1=ra.x+ra.w,y1=ra.y+ra.h/2,x2=rb.x,y2=rb.y+rb.h/2,mx=(x1+x2)/2;
+    const st=STYLES[e.style]||STYLES.guar;const dash=st.dash==='none'?'':`stroke-dasharray="${st.dash}"`;
+    const pathD=lineRouting==='straight'?`M ${x1} ${y1} L ${mx} ${y1} L ${mx} ${y2} L ${x2} ${y2}`:`M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
+    svgEdges+=`<path d="${pathD}" fill="none" stroke="${e.color}" stroke-width="${st.w}" stroke-linecap="${st.cap}" ${dash}/>`;});
+  let cols='',nodeHtml='';
+  COLS.forEach(c=>{cols+=`<div style="position:absolute;left:${c.x}px;top:0;width:${c.w}px;height:100%;background:#e9eef4;opacity:.5;border-radius:10px"></div>
+    <div style="position:absolute;left:${c.x}px;top:14px;width:${c.w}px;text-align:center;font-weight:700;color:#3a4654;font:13px Segoe UI,sans-serif">${c.label}</div>`;});
+  nodes.forEach(n=>{nodeHtml+=`<div style="position:absolute;left:${n.x}px;top:${n.y}px;width:${(n.w||184)}px;background:${n.color};color:#fff;border-radius:8px;padding:9px 11px;font:11.5px Segoe UI,sans-serif;line-height:1.3;box-shadow:0 4px 10px rgba(0,0,0,.12)">
+    <b>${esc(n.title)}</b>${n.code?`<br><span style="font-size:9.5px;opacity:.85">${esc(n.code)}</span>`:''}</div>`;});
+  let legend=Object.values(STYLES).map(v=>{const dash=v.dash==='none'?'':`stroke-dasharray="${v.dash}"`;
+    return `<div style="display:flex;align-items:center;gap:8px;margin:6px 0;font:12px Segoe UI,sans-serif"><svg width="44" height="12"><line x1="0" y1="6" x2="44" y2="6" stroke="#333" stroke-width="${v.w}" stroke-linecap="${v.cap}" ${dash}/></svg><span>${v.label}</span></div>`;}).join('');
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Creative Industries Pathways</title></head>
+  <body style="margin:0;background:#f4f6f9"><div style="padding:14px 20px;font:700 16px Segoe UI,sans-serif">Creative Industries — Pathways (515T)</div>
+  <div style="overflow:auto"><div style="position:relative;width:${w}px;height:${h}px">
+  ${cols}<svg style="position:absolute;inset:0;width:100%;height:100%">${svgEdges}</svg>${nodeHtml}</div></div>
+  <div style="padding:16px 20px">${legend}</div></body></html>`;
+  download('ci_pathways_view.html',html,'text/html');
+}
+
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// ===== PDF export (canvas-based, no external deps) =====
+
+function hexToRgb(hex){
+  return{r:parseInt(hex.slice(1,3),16),g:parseInt(hex.slice(3,5),16),b:parseInt(hex.slice(5,7),16)};
+}
+
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+
+function wrapText(ctx,text,maxW){
+  const words=text.split(' '), lines=[];
+  let cur='';
+  words.forEach(w=>{
+    const test=cur?cur+' '+w:w;
+    if(ctx.measureText(test).width>maxW&&cur){lines.push(cur);cur=w;}
+    else{cur=test;}
+  });
+  if(cur)lines.push(cur);
+  return lines;
+}
+
+function buildMapCanvas(){
+  let minX=Infinity, minY=Infinity, maxX=0, maxY=0;
+  COLS.forEach(c=>{minX=Math.min(minX,c.x);maxX=Math.max(maxX,c.x+c.w);});
+  nodes.forEach(n=>{
+    const el=document.querySelector(`.node[data-id="${n.id}"]`);
+    const h=el?el.offsetHeight:40;
+    minX=Math.min(minX,n.x); minY=Math.min(minY,n.y);
+    maxX=Math.max(maxX,n.x+(n.w||184)); maxY=Math.max(maxY,n.y+h);
+  });
+  const PAD=40, HEADER_H=60, LEGEND_H=80;
+  const cW=maxX-minX+PAD*2, cH=maxY-minY+PAD*2+HEADER_H+LEGEND_H;
+  const DPR=2;
+  const canvas=document.createElement('canvas');
+  canvas.width=cW*DPR; canvas.height=cH*DPR;
+  const ctx=canvas.getContext('2d');
+  ctx.scale(DPR,DPR);
+  const ox=-minX+PAD, oy=-minY+PAD+HEADER_H;
+  ctx.fillStyle='#f4f6f9'; ctx.fillRect(0,0,cW,cH);
+  const badge2=document.querySelector('.badge')?.textContent||'515T';
+  const title2=document.querySelector('header h1')?.textContent||'Pathways';
+  ctx.font='bold 20px "Segoe UI",Helvetica,Arial,sans-serif';
+  ctx.fillStyle='#1d2530';
+  ctx.fillText(`${badge2}  ${title2}`,PAD,HEADER_H*0.6);
+  COLS.forEach(c=>{
+    ctx.fillStyle='rgba(233,238,244,0.55)';
+    roundRect(ctx,ox+c.x,oy-PAD+minY,c.w,maxY-minY+PAD*2,10); ctx.fill();
+    ctx.font='bold 13px "Segoe UI",Helvetica,Arial,sans-serif';
+    ctx.fillStyle='#3a4654'; ctx.textAlign='center';
+    ctx.fillText(c.label,ox+c.x+c.w/2,oy-PAD+minY+22);
+    ctx.textAlign='left';
+  });
+  edges.forEach(e=>{
+    const a=nodes.find(n=>n.id===e.from), b=nodes.find(n=>n.id===e.to);
+    if(!a||!b) return;
+    const ra=nodeRect(a), rb=nodeRect(b);
+    const x1=ox+ra.x+ra.w, y1=oy+ra.y+ra.h/2, x2=ox+rb.x, y2=oy+rb.y+rb.h/2;
+    const mx=(x1+x2)/2;
+    const st=STYLES[e.style]||STYLES.guar;
+    ctx.beginPath(); ctx.strokeStyle=e.color||'#555';
+    ctx.lineWidth=st.w; ctx.lineCap=st.cap;
+    if(st.dash!=='none') ctx.setLineDash(st.dash.split(' ').map(Number));
+    else ctx.setLineDash([]);
+    ctx.moveTo(x1,y1);
+    if(lineRouting==='straight'){ctx.lineTo(mx,y1);ctx.lineTo(mx,y2);ctx.lineTo(x2,y2);}
+    else ctx.bezierCurveTo(mx,y1,mx,y2,x2,y2);
+    ctx.stroke();
+  });
+  ctx.setLineDash([]);
+  nodes.forEach(n=>{
+    const el=document.querySelector(`.node[data-id="${n.id}"]`);
+    const h=el?el.offsetHeight:40, w=n.w||184;
+    const nx=ox+n.x, ny=oy+n.y;
+    ctx.fillStyle=n.color; roundRect(ctx,nx,ny,w,h,6); ctx.fill();
+    ctx.fillStyle='#fff';
+    ctx.font='bold 10.5px "Segoe UI",Helvetica,Arial,sans-serif';
+    const lines=wrapText(ctx,n.title,w-14);
+    lines.forEach((ln,i)=>ctx.fillText(ln,nx+7,ny+13+i*12));
+    if(n.code){
+      ctx.font='600 9px "Segoe UI",Helvetica,Arial,sans-serif';
+      ctx.globalAlpha=0.85;
+      ctx.fillText(n.code,nx+7,ny+13+lines.length*12+3);
+      ctx.globalAlpha=1;
+    }
+  });
+  const legY2=oy+maxY+PAD+10;
+  let legX2=PAD;
+  Object.values(STYLES).forEach(v=>{
+    ctx.beginPath(); ctx.strokeStyle='#333'; ctx.lineWidth=v.w; ctx.lineCap=v.cap;
+    if(v.dash!=='none') ctx.setLineDash(v.dash.split(' ').map(Number));
+    else ctx.setLineDash([]);
+    ctx.moveTo(legX2,legY2); ctx.lineTo(legX2+40,legY2); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='#1d2530';
+    ctx.font='12px "Segoe UI",Helvetica,Arial,sans-serif';
+    ctx.fillText(v.label,legX2+46,legY2+4);
+    legX2+=46+ctx.measureText(v.label).width+24;
+  });
+  return {canvas, cW, cH, DPR};
+}
+
+document.getElementById('expPng').onclick=function(){
+  const {canvas}=buildMapCanvas();
+  const title2=document.querySelector('header h1')?.textContent||'pathways';
+  const fname=title2.replace(/[^a-z0-9]/gi,'_').toLowerCase()+'.png';
+  const a=document.createElement('a');
+  a.href=canvas.toDataURL('image/png');
+  a.download=fname; a.click();
+};
+
+function buildSlideCanvas(){
+  // bounding box
+  let minX=Infinity,minY=Infinity,maxX=0,maxY=0;
+  COLS.forEach(c=>{minX=Math.min(minX,c.x);maxX=Math.max(maxX,c.x+c.w);});
+  nodes.forEach(n=>{
+    const el=document.querySelector(`.node[data-id="${n.id}"]`);
+    const h=el?el.offsetHeight:40;
+    minX=Math.min(minX,n.x);minY=Math.min(minY,n.y);
+    maxX=Math.max(maxX,n.x+(n.w||184));maxY=Math.max(maxY,n.y+h);
+  });
+
+  const SW=1920,SH=1080,DPR=2;
+  const canvas=document.createElement('canvas');
+  canvas.width=SW*DPR;canvas.height=SH*DPR;
+  const ctx=canvas.getContext('2d');
+  ctx.scale(DPR,DPR);
+
+  // background
+  ctx.fillStyle='#f4f6f9';ctx.fillRect(0,0,SW,SH);
+
+  // header bar
+  const HDRH=48,PAD=28;
+  ctx.fillStyle='#ffffff';ctx.fillRect(0,0,SW,HDRH);
+  ctx.strokeStyle='#dfe5ec';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(0,HDRH);ctx.lineTo(SW,HDRH);ctx.stroke();
+  const badge2=document.querySelector('.badge')?.textContent||'';
+  const title2=document.querySelector('header h1')?.textContent||'Pathways';
+  // badge pill
+  if(badge2){
+    ctx.font='bold 11px "Segoe UI",Helvetica,Arial,sans-serif';
+    const bw=ctx.measureText(badge2).width+14;
+    ctx.fillStyle='#d4543a';roundRect(ctx,PAD,14,bw,20,10);ctx.fill();
+    ctx.fillStyle='#fff';ctx.fillText(badge2,PAD+7,28);
+    ctx.font='bold 18px "Segoe UI",Helvetica,Arial,sans-serif';
+    ctx.fillStyle='#1d2530';ctx.fillText(title2,PAD+bw+10,30);
+  } else {
+    ctx.font='bold 18px "Segoe UI",Helvetica,Arial,sans-serif';
+    ctx.fillStyle='#1d2530';ctx.fillText(title2,PAD,30);
+  }
+
+  // legend strip at bottom
+  const LEGH=28;
+  ctx.fillStyle='#ffffff';ctx.fillRect(0,SH-LEGH,SW,LEGH);
+  ctx.strokeStyle='#dfe5ec';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(0,SH-LEGH);ctx.lineTo(SW,SH-LEGH);ctx.stroke();
+  let legX=PAD;const legY=SH-LEGH/2+1;
+  ctx.font='10.5px "Segoe UI",Helvetica,Arial,sans-serif';
+  Object.values(STYLES).forEach(v=>{
+    ctx.beginPath();ctx.strokeStyle='#444';ctx.lineWidth=v.w;ctx.lineCap=v.cap;
+    if(v.dash!=='none')ctx.setLineDash(v.dash.split(' ').map(Number));
+    else ctx.setLineDash([]);
+    ctx.moveTo(legX,legY);ctx.lineTo(legX+30,legY);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='#4a5568';ctx.lineWidth=1;
+    ctx.fillText(v.label,legX+34,legY+4);
+    legX+=34+ctx.measureText(v.label).width+20;
+  });
+
+  // content area: fit map into the space between header and legend
+  const availW=SW-PAD*2;
+  const availH=SH-HDRH-LEGH-PAD;
+  const contentW=maxX-minX;
+  const contentH=maxY-minY;
+  const scale=Math.min(availW/contentW, availH/contentH);
+  const drawW=contentW*scale,drawH=contentH*scale;
+  const tx=PAD+(availW-drawW)/2 - minX*scale;
+  const ty=HDRH+PAD/2+(availH-drawH)/2 - minY*scale;
+
+  ctx.save();
+  ctx.translate(tx,ty);
+  ctx.scale(scale,scale);
+
+  // column backgrounds + labels
+  COLS.forEach(c=>{
+    ctx.fillStyle='rgba(233,238,244,0.6)';
+    roundRect(ctx,c.x,minY,c.w,maxY-minY,10);ctx.fill();
+    ctx.font='bold 13px "Segoe UI",Helvetica,Arial,sans-serif';
+    ctx.fillStyle='#3a4654';ctx.textAlign='center';
+    ctx.fillText(c.label,c.x+c.w/2,minY-6);
+    ctx.textAlign='left';
+  });
+
+  // edges
+  edges.forEach(e=>{
+    const a=nodes.find(n=>n.id===e.from),b=nodes.find(n=>n.id===e.to);
+    if(!a||!b)return;
+    const ra=nodeRect(a),rb=nodeRect(b);
+    const x1=ra.x+ra.w,y1=ra.y+ra.h/2,x2=rb.x,y2=rb.y+rb.h/2,mx=(x1+x2)/2;
+    const st=STYLES[e.style]||STYLES.guar;
+    ctx.beginPath();ctx.strokeStyle=e.color||'#555';
+    ctx.lineWidth=st.w;ctx.lineCap=st.cap;
+    if(st.dash!=='none')ctx.setLineDash(st.dash.split(' ').map(Number));
+    else ctx.setLineDash([]);
+    ctx.moveTo(x1,y1);
+    if(lineRouting==='straight'){ctx.lineTo(mx,y1);ctx.lineTo(mx,y2);ctx.lineTo(x2,y2);}
+    else ctx.bezierCurveTo(mx,y1,mx,y2,x2,y2);
+    ctx.stroke();
+  });
+  ctx.setLineDash([]);
+
+  // nodes
+  nodes.forEach(n=>{
+    const el=document.querySelector(`.node[data-id="${n.id}"]`);
+    const h=el?el.offsetHeight:40,w=n.w||184;
+    ctx.fillStyle=n.color;roundRect(ctx,n.x,n.y,w,h,6);ctx.fill();
+    ctx.fillStyle='#fff';
+    ctx.font='bold 10.5px "Segoe UI",Helvetica,Arial,sans-serif';
+    const lines=wrapText(ctx,n.title,w-14);
+    lines.forEach((ln,i)=>ctx.fillText(ln,n.x+7,n.y+13+i*12));
+    if(n.code){
+      ctx.font='600 9px "Segoe UI",Helvetica,Arial,sans-serif';
+      ctx.globalAlpha=0.85;
+      ctx.fillText(n.code,n.x+7,n.y+13+lines.length*12+3);
+      ctx.globalAlpha=1;
+    }
+  });
+
+  ctx.restore();
+  return canvas;
+}
+
+document.getElementById('expSlide').onclick=function(){
+  const canvas=buildSlideCanvas();
+  const title2=document.querySelector('header h1')?.textContent||'pathways';
+  const fname=title2.replace(/[^a-z0-9]/gi,'_').toLowerCase()+'_slide.png';
+  const a=document.createElement('a');
+  a.href=canvas.toDataURL('image/png');
+  a.download=fname;a.click();
+};
+
+document.getElementById('expPdf').onclick=function(){
+  const {canvas, cW, cH, DPR}=buildMapCanvas();
+
+  // ---- Build PDF with JPEG image ----
+  const jpegUrl=canvas.toDataURL('image/jpeg',0.95);
+  const jpegB64=jpegUrl.split(',')[1];
+  const jpegBin=atob(jpegB64);
+  const jpegLen=jpegBin.length;
+  const jpegArr=new Uint8Array(jpegLen);
+  for(let i=0;i<jpegLen;i++) jpegArr[i]=jpegBin.charCodeAt(i);
+
+  const pixW=cW*DPR, pixH=cH*DPR;
+  // Page in points — A3 landscape width, height proportional
+  const pgW=842, pgH=Math.round(842*(cH/cW));
+
+  // Build PDF byte by byte
+  const enc=new TextEncoder();
+  const parts=[];
+  const offsets=[];
+  let pos=0;
+  function w(s){const a=enc.encode(s);parts.push(a);pos+=a.length;}
+  function wbin(a){parts.push(a);pos+=a.length;}
+
+  w('%PDF-1.4\n%\xFF\xFF\xFF\xFF\n');
+
+  // obj 1: catalog
+  offsets[1]=pos;
+  w('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+
+  // obj 2: pages
+  offsets[2]=pos;
+  w('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n');
+
+  // obj 3: page
+  offsets[3]=pos;
+  w(`3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pgW} ${pgH}] /Contents 4 0 R /Resources << /XObject << /Img 5 0 R >> >> >>\nendobj\n`);
+
+  // obj 4: content stream
+  const cs=`q ${pgW} 0 0 ${pgH} 0 0 cm /Img Do Q`;
+  offsets[4]=pos;
+  w(`4 0 obj\n<< /Length ${cs.length} >>\nstream\n${cs}\nendstream\nendobj\n`);
+
+  // obj 5: image
+  offsets[5]=pos;
+  w(`5 0 obj\n<< /Type /XObject /Subtype /Image /Width ${pixW} /Height ${pixH} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpegLen} >>\nstream\n`);
+  wbin(jpegArr);
+  w('\nendstream\nendobj\n');
+
+  // xref
+  const xrefPos=pos;
+  w('xref\n');
+  w(`0 6\n`);
+  w('0000000000 65535 f \n');
+  for(let i=1;i<=5;i++){
+    w(String(offsets[i]).padStart(10,'0')+' 00000 n \n');
+  }
+
+  w('trailer\n<< /Size 6 /Root 1 0 R >>\n');
+  w('startxref\n'+xrefPos+'\n%%EOF\n');
+
+  const blob=new Blob(parts,{type:'application/pdf'});
+  const u=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const pdfTitle=document.querySelector('header h1')?.textContent||'pathways';
+  const pdfFname=pdfTitle.replace(/[^a-z0-9]/gi,'_').toLowerCase()+'.pdf';
+  a.href=u; a.download=pdfFname; a.click();
+  URL.revokeObjectURL(u);
+};
+
+// ===== options =====
+document.getElementById('lineRouting').onchange=e=>{lineRouting=e.target.value;renderEdges();};
+
+// ===== column editor =====
+function renderColEditor(){
+  const box=document.getElementById('colEditor');
+  box.innerHTML=COLS.map((c,i)=>`<div class="col-edit">
+    <input type="text" value="${esc(c.label)}" data-ci="${i}">
+    <button data-ci="${i}" title="Remove column">✕</button>
+  </div>`).join('');
+  box.querySelectorAll('input').forEach(inp=>{
+    inp.oninput=()=>{
+      const ci=+inp.dataset.ci;
+      COLS[ci].label=inp.value;
+      rebuildCols();
+    };
+  });
+  box.querySelectorAll('button').forEach(btn=>{
+    btn.onclick=()=>{
+      const ci=+btn.dataset.ci;
+      const removed=COLS[ci];
+      // Remove nodes in this column
+      nodes=nodes.filter(n=>n.col!==removed.id);
+      edges=edges.filter(e=>nodes.find(n=>n.id===e.from)&&nodes.find(n=>n.id===e.to));
+      COLS.splice(ci,1);
+      recalcColPositions();
+      rebuildCols();
+      renderNodes();renderEdges();inspect();
+      renderColEditor();
+    };
+  });
+}
+document.getElementById('addColBtn').onclick=()=>{
+  const lastCol=COLS[COLS.length-1];
+  const newId=(lastCol?lastCol.id:0)+1;
+  COLS.push({id:newId,label:'New Level',x:(lastCol?lastCol.x+lastCol.w:0)+20,w:230});
+  recalcColPositions();
+  rebuildCols();
+  // Update node inspector AQF dropdown
+  inspect();
+  renderColEditor();
+};
+function recalcColPositions(){
+  let x=20;
+  COLS.forEach(c=>{c.x=x;x+=c.w+20;});
+  // Widen board to fit
+  board.style.width=Math.max(2000,x+200)+'px';
+}
+function rebuildCols(){
+  document.querySelectorAll('.col,.col-label').forEach(el=>el.remove());
+  renderCols();
+}
+
+// ===== boot =====
+seed();renderCols();renderNodes();renderEdges();renderLegend();inspect();renderColEditor();
+</script>
+
+<!-- ===== ONBOARDING TOUR ===== -->
+<style>
+#tour-overlay{position:fixed;inset:0;z-index:9000;pointer-events:none}
+#tour-overlay.active{pointer-events:all}
+#tour-spotlight{
+  position:fixed;border-radius:10px;pointer-events:none;z-index:9001;
+  box-shadow:0 0 0 5px rgba(255,255,255,.85),0 0 0 9999px rgba(15,25,40,.6);
+  transition:top .32s ease,left .32s ease,width .32s ease,height .32s ease,opacity .2s;
+}
+#tour-spotlight.hidden{opacity:0;pointer-events:none;box-shadow:none}
+#tour-card{
+  position:fixed;z-index:9002;background:#fff;border-radius:14px;
+  padding:22px 24px 18px;width:300px;
+  box-shadow:0 16px 48px rgba(0,0,0,.2),0 2px 8px rgba(0,0,0,.08);
+  transition:top .32s ease,left .32s ease;
+}
+#tour-card h3{margin:0 0 8px;font-size:15px;font-weight:700;color:#1d2530}
+#tour-card p{margin:0 0 18px;font-size:13px;color:#4a5568;line-height:1.6}
+#tour-step-lbl{font-size:10px;color:#aab4c2;font-weight:700;letter-spacing:.6px;text-transform:uppercase;margin-bottom:6px}
+.t-footer{display:flex;align-items:center;gap:6px}
+.t-dots{flex:1;display:flex;gap:5px;align-items:center}
+.t-dot{width:7px;height:7px;border-radius:50%;background:#dfe5ec;transition:background .2s,transform .2s;flex-shrink:0}
+.t-dot.on{background:#d4543a;transform:scale(1.25)}
+.t-btn{font:inherit;font-size:12.5px;font-weight:600;border-radius:8px;cursor:pointer;padding:7px 14px;transition:.15s;white-space:nowrap}
+.t-btn.tnext{background:#d4543a;color:#fff;border:none}
+.t-btn.tnext:hover{background:#b8432c}
+.t-btn.tprev{background:none;border:1px solid #dfe5ec;color:#6b7785;font-size:12px}
+.t-btn.tprev:hover{border-color:#aaa;color:#333}
+.t-btn.tskip{background:none;border:none;color:#bbc3ce;font-size:12px;padding:7px 6px}
+.t-btn.tskip:hover{color:#666}
+#tour-help-btn{font:inherit;font-size:12px;font-weight:600;border:1px solid #dfe5ec;background:#fff;
+  color:#6b7785;padding:6px 11px;border-radius:8px;cursor:pointer;transition:.15s;margin-left:4px}
+#tour-help-btn:hover{border-color:#d4543a;color:#d4543a}
+</style>
+
+<div id="tour-overlay"></div>
+<div id="tour-spotlight" class="hidden"></div>
+<div id="tour-card" style="display:none">
+  <div id="tour-step-lbl"></div>
+  <h3 id="tour-title"></h3>
+  <p id="tour-text"></p>
+  <div class="t-footer">
+    <div class="t-dots" id="tour-dots"></div>
+    <button class="t-btn tskip" id="tour-skip">Skip</button>
+    <button class="t-btn tprev" id="tour-prev" style="display:none">Back</button>
+    <button class="t-btn tnext" id="tour-next">Next →</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  const STEPS=[
+    {
+      target:null,placement:'center',
+      title:'Welcome to Pathways Editor',
+      text:'This quick tour walks you through the key features. Click Next to begin, or Skip to jump straight in.'
+    },
+    {
+      els:['header .badge','header h1'],placement:'bottom-left',
+      title:'Editable Title & Code',
+      text:'Click the red badge to change the course code, or click the title to rename the map. Both update in your PDF exports.'
+    },
+    {
+      sel:'#addBtn',placement:'bottom',
+      title:'Add a Box',
+      text:'Creates a new course or qualification on the canvas. Drag it into position and use the Inspector panel to fill in the title, code, and colour.'
+    },
+    {
+      sel:'#linkBtn',placement:'bottom',
+      title:'Link Mode',
+      text:'Activate Link mode, then hover over a box until the connection dots appear on its sides. Drag from one dot to another box to draw a pathway arrow.'
+    },
+    {
+      sel:'#delBtn',placement:'bottom',
+      title:'Delete',
+      text:'Select any box or connection on the canvas, then click Delete or press the Del key to remove it.'
+    },
+    {
+      sel:'#expPdf',placement:'bottom',
+      title:'Export',
+      text:'Export your map as a PDF (printable), PNG (image), or Slide (1920×1080 PNG scaled to fit a PowerPoint landscape slide).'
+    },
+    {
+      sel:'.side',placement:'right',
+      title:'Inspector & Options',
+      text:'Click any box or connection to select it — its properties appear here for editing: title, course code, colour, and connection type. The Columns section lets you rename or add AQF levels.'
+    },
+    {
+      target:null,placement:'center',last:true,
+      title:"You're all set!",
+      text:'Start building your pathway map. Reopen this tour anytime with the ? Tour button in the toolbar.'
+    },
+  ];
+
+  let step=0;
+  const overlay  = document.getElementById('tour-overlay');
+  const spotlight= document.getElementById('tour-spotlight');
+  const card     = document.getElementById('tour-card');
+  const stepLbl  = document.getElementById('tour-step-lbl');
+  const titleEl  = document.getElementById('tour-title');
+  const textEl   = document.getElementById('tour-text');
+  const dotsEl   = document.getElementById('tour-dots');
+  const skipBtn  = document.getElementById('tour-skip');
+  const prevBtn  = document.getElementById('tour-prev');
+  const nextBtn  = document.getElementById('tour-next');
+
+  function getRect(s){
+    if(s.target===null && !s.els && !s.sel) return null;
+    if(s.els){
+      const rects=s.els.map(q=>document.querySelector(q)?.getBoundingClientRect()).filter(Boolean);
+      if(!rects.length) return null;
+      const top=Math.min(...rects.map(r=>r.top));
+      const left=Math.min(...rects.map(r=>r.left));
+      const bottom=Math.max(...rects.map(r=>r.bottom));
+      const right=Math.max(...rects.map(r=>r.right));
+      return {top,left,bottom,right,width:right-left,height:bottom-top};
+    }
+    if(s.sel){
+      const el=document.querySelector(s.sel);
+      return el?el.getBoundingClientRect():null;
+    }
+    return null;
+  }
+
+  function placeCard(rect,placement){
+    const PAD=14, CW=300, vh=window.innerHeight, vw=window.innerWidth;
+    let top,left;
+    if(!rect||placement==='center'){
+      top=vh/2-120; left=vw/2-CW/2;
+    } else if(placement==='bottom'||placement==='bottom-left'){
+      top=rect.bottom+PAD;
+      left=placement==='bottom-left'?rect.left:rect.left+rect.width/2-CW/2;
+      left=Math.max(PAD,Math.min(left,vw-CW-PAD));
+      if(top+220>vh) top=rect.top-220-PAD;
+    } else if(placement==='right'){
+      top=rect.top+rect.height/2-110;
+      left=rect.right+PAD;
+      if(left+CW>vw) left=rect.left-CW-PAD;
+      top=Math.max(PAD,Math.min(top,vh-240));
+    }
+    card.style.top=top+'px';
+    card.style.left=left+'px';
+  }
+
+  function renderStep(){
+    const s=STEPS[step];
+    const rect=getRect(s);
+    const PAD=10;
+    if(rect){
+      spotlight.style.top=(rect.top-PAD)+'px';
+      spotlight.style.left=(rect.left-PAD)+'px';
+      spotlight.style.width=(rect.width+PAD*2)+'px';
+      spotlight.style.height=(rect.height+PAD*2)+'px';
+      spotlight.classList.remove('hidden');
+    } else {
+      spotlight.classList.add('hidden');
+    }
+    placeCard(rect,s.placement);
+    const total=STEPS.length;
+    stepLbl.textContent=s.last?'':('Step '+(step+1)+' of '+total);
+    titleEl.textContent=s.title;
+    textEl.textContent=s.text;
+    nextBtn.textContent=s.last?'Get started ✓':'Next →';
+    prevBtn.style.display=step>0?'':'none';
+    dotsEl.innerHTML='';
+    STEPS.forEach((_,i)=>{
+      const d=document.createElement('div');
+      d.className='t-dot'+(i===step?' on':'');
+      dotsEl.appendChild(d);
+    });
+  }
+
+  function startTour(){
+    step=0;
+    overlay.classList.add('active');
+    card.style.display='block';
+    renderStep();
+  }
+
+  function endTour(){
+    overlay.classList.remove('active');
+    spotlight.classList.add('hidden');
+    card.style.display='none';
+    localStorage.setItem('pathway-tour-done','1');
+  }
+
+  nextBtn.onclick=()=>{ if(step>=STEPS.length-1){endTour();return;} step++; renderStep(); };
+  prevBtn.onclick=()=>{ if(step>0){step--;renderStep();} };
+  skipBtn.onclick=endTour;
+  document.addEventListener('keydown',e=>{
+    if(!overlay.classList.contains('active')) return;
+    if(e.key==='Escape') endTour();
+    if(e.key==='ArrowRight'&&step<STEPS.length-1){step++;renderStep();}
+    if(e.key==='ArrowLeft'&&step>0){step--;renderStep();}
+  });
+
+  // "? Tour" button in header
+  const helpBtn=document.createElement('button');
+  helpBtn.id='tour-help-btn';
+  helpBtn.textContent='? Tour';
+  helpBtn.onclick=startTour;
+  document.querySelector('header .spacer').insertAdjacentElement('afterend',helpBtn);
+
+  // Auto-start for first-time visitors
+  if(!localStorage.getItem('pathway-tour-done')) startTour();
+})();
+</script>
+
+</body></html>
