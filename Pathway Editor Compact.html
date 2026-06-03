@@ -115,6 +115,19 @@
   .exp-menu button:hover{background:#f4f6f9;color:var(--accent)}
   .exp-menu hr{border:none;border-top:1px solid var(--line);margin:3px 8px}
   .views-menu{min-width:170px}
+  .view-modal{position:fixed;inset:0;background:rgba(15,25,40,.42);z-index:500;display:none;align-items:flex-start;justify-content:center;padding:76px 18px 18px}
+  .view-modal.open{display:flex}
+  .view-panel{width:min(520px,100%);max-height:72vh;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 14px 42px rgba(20,30,45,.22);overflow:hidden}
+  .view-head{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line)}
+  .view-head h3{font-size:13px;margin:0;flex:1}
+  .view-close{font:inherit;border:1px solid var(--line);background:#fff;border-radius:7px;cursor:pointer;padding:4px 8px}
+  .view-list{padding:8px;overflow:auto;max-height:calc(72vh - 49px)}
+  .view-row{display:flex;align-items:center;gap:8px;width:100%;border:1px solid var(--line);background:#fff;border-radius:8px;margin:6px 0;padding:8px}
+  .view-load{flex:1;text-align:left;border:none;background:transparent;color:var(--ink);cursor:pointer;padding:2px 4px}
+  .view-name{display:block;font-size:12.5px;font-weight:700}
+  .view-meta{display:block;font-size:10.5px;color:var(--muted);margin-top:2px}
+  .view-delete{border:1px solid var(--line);background:#fff;color:#c0392b;border-radius:7px;cursor:pointer;width:32px;height:30px;flex-shrink:0}
+  .view-delete:hover{border-color:#c0392b;background:#fff5f3}
 </style>
 </head>
 <body>
@@ -734,17 +747,57 @@ async function loadCloudView(){
   const list=await res.json();
   if(!res.ok)throw new Error(list.error||'Could not load views');
   if(!list.views.length){alert('No saved views yet.');return;}
-  const options=list.views.map((v,i)=>`${i+1}. ${v.name} (${v.id})`).join('\n');
-  const pick=prompt(`Choose a view number or paste a view ID:\n\n${options}`,'1');
-  if(!pick)return;
-  const chosen=list.views[Number(pick)-1]||list.views.find(v=>v.id===pick.trim());
-  const id=chosen?chosen.id:pick.trim();
+  renderViewList(list.views);
+  document.getElementById('viewModal').classList.add('open');
+}
+async function loadCloudViewById(id){
   const viewRes=await fetch(`${VIEW_API}/views/${encodeURIComponent(id)}`);
   const view=await viewRes.json();
   if(!viewRes.ok)throw new Error(view.error||'Could not load view');
   if(view.title)document.querySelector('header h1').textContent=view.title;
   if(view.badge)document.querySelector('header .badge').textContent=view.badge;
   applyViewData(view.data);
+  closeViewList();
+}
+async function deleteCloudView(id,name){
+  const token=localStorage.getItem(`pathway-view-token:${id}`);
+  if(!token){alert('This browser can only delete views it saved.');return;}
+  if(!confirm(`Delete "${name}"?`))return;
+  const res=await fetch(`${VIEW_API}/views/${encodeURIComponent(id)}`,{method:'DELETE',headers:{'x-edit-token':token}});
+  const result=await res.json();
+  if(!res.ok)throw new Error(result.error||'Could not delete view');
+  localStorage.removeItem(`pathway-view-token:${id}`);
+  const refreshed=await fetch(`${VIEW_API}/views?editor=${encodeURIComponent(EDITOR_ID)}`);
+  const list=await refreshed.json();
+  if(!refreshed.ok)throw new Error(list.error||'Could not refresh views');
+  if(!list.views.length){closeViewList();return;}
+  renderViewList(list.views);
+}
+function ensureViewModal(){
+  if(document.getElementById('viewModal'))return;
+  document.body.insertAdjacentHTML('beforeend',`<div class="view-modal" id="viewModal">
+    <div class="view-panel">
+      <div class="view-head"><h3>Saved views</h3><button class="view-close" id="viewClose">Close</button></div>
+      <div class="view-list" id="viewList"></div>
+    </div>
+  </div>`);
+  document.getElementById('viewClose').onclick=closeViewList;
+  document.getElementById('viewModal').addEventListener('click',e=>{if(e.target.id==='viewModal')closeViewList();});
+}
+function closeViewList(){document.getElementById('viewModal')?.classList.remove('open');}
+function renderViewList(views){
+  ensureViewModal();
+  const list=document.getElementById('viewList');
+  list.innerHTML=views.map(v=>`<div class="view-row" data-id="${esc(v.id)}">
+    <button class="view-load"><span class="view-name">${esc(v.name||'Untitled view')}</span><span class="view-meta">${esc(v.updatedAt||'')}</span></button>
+    <button class="view-delete" title="Delete view">🗑</button>
+  </div>`).join('');
+  list.querySelectorAll('.view-row').forEach(row=>{
+    const id=row.dataset.id;
+    const view=views.find(v=>v.id===id);
+    row.querySelector('.view-load').onclick=()=>loadCloudViewById(id).catch(err=>alert(err.message));
+    row.querySelector('.view-delete').onclick=e=>{e.stopPropagation();deleteCloudView(id,view?.name||'Untitled view').catch(err=>alert(err.message));};
+  });
 }
 document.getElementById('saveViewBtn').onclick=()=>saveCloudView().catch(err=>alert(err.message));
 document.getElementById('loadViewBtn').onclick=()=>loadCloudView().catch(err=>alert(err.message));
