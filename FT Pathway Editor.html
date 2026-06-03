@@ -84,7 +84,9 @@
   .empty{color:var(--muted);font-size:12px;font-style:italic}
   .kbd{font-family:monospace;background:#eef1f5;border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:11px}
   .col-edit{display:flex;align-items:center;gap:6px;margin:5px 0}
-  .col-edit input{flex:1;font:inherit;font-size:12px;padding:5px 7px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+  .col-edit input{font:inherit;font-size:12px;padding:5px 7px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+  .col-edit input.col-label-input{flex:1;min-width:0}
+  .col-edit input.col-width-input{width:64px;flex-shrink:0}
   .col-edit button{font:inherit;font-size:11px;border:1px solid var(--line);background:#fff;color:var(--muted);
     padding:4px 7px;border-radius:6px;cursor:pointer;flex-shrink:0}
   .col-edit button:hover{border-color:#c0392b;color:#c0392b}
@@ -799,7 +801,7 @@ function applyViewData(d){
   Object.keys(STYLES).forEach(k=>delete STYLES[k]);
   Object.assign(STYLES,d.styles||{});
   nodes=d.nodes||[];edges=d.edges||[];
-  normalizeColWidths();
+  recalcColPositions();
   if(d.lineRouting){lineRouting=d.lineRouting;document.getElementById('lineRouting').value=lineRouting;}
   syncCounters();clearSel();rebuildCols();renderNodes();renderEdges();renderLegend();inspect();renderColEditor();
 }
@@ -1294,14 +1296,24 @@ document.getElementById('lineRouting').onchange=e=>{lineRouting=e.target.value;r
 function renderColEditor(){
   const box=document.getElementById('colEditor');
   box.innerHTML=COLS.map((c,i)=>`<div class="col-edit">
-    <input type="text" value="${esc(c.label)}" data-ci="${i}">
+    <input class="col-label-input" type="text" value="${esc(c.label)}" data-ci="${i}" aria-label="Column label">
+    <input class="col-width-input" type="number" min="160" max="360" step="10" value="${Math.round(c.w||COL_WIDTH)}" data-ci="${i}" aria-label="Column width">
     <button data-ci="${i}" title="Remove column">✕</button>
   </div>`).join('');
-  box.querySelectorAll('input').forEach(inp=>{
+  box.querySelectorAll('.col-label-input').forEach(inp=>{
     inp.oninput=()=>{
       const ci=+inp.dataset.ci;
       COLS[ci].label=inp.value;
       rebuildCols();
+    };
+  });
+  box.querySelectorAll('.col-width-input').forEach(inp=>{
+    inp.onchange=()=>{
+      const ci=+inp.dataset.ci;
+      COLS[ci].w=Math.max(160,Math.min(360,Number(inp.value)||COL_WIDTH));
+      inp.value=Math.round(COLS[ci].w);
+      recalcColPositions();
+      rebuildCols();renderNodes();renderEdges();inspect();
     };
   });
   box.querySelectorAll('button').forEach(btn=>{
@@ -1329,23 +1341,20 @@ document.getElementById('addColBtn').onclick=()=>{
   inspect();
   renderColEditor();
 };
-function normalizeColWidths(){
+function recalcColPositions(){
   const previous=COLS.map(c=>({id:c.id,x:Number(c.x)||20,w:Number(c.w)||COL_WIDTH}));
   let x=20;
-  COLS.forEach(c=>{c.w=COL_WIDTH;c.x=x;x+=COL_WIDTH+20;});
+  COLS.forEach(c=>{c.w=Math.max(160,Math.min(360,Number(c.w)||COL_WIDTH));c.x=x;x+=c.w+20;});
   nodes.forEach(n=>{
     const col=COLS.find(c=>c.id===n.col);
     const old=previous.find(c=>c.id===n.col);
     if(!col)return;
     const base=old?old.x:col.x;
-    const maxOffset=Math.max(0,COL_WIDTH-(n.w||184));
+    const maxOffset=Math.max(0,col.w-(n.w||184));
     const offset=Math.max(0,Math.min((Number(n.x)||base+15)-base,maxOffset));
     n.x=col.x+offset;
   });
   board.style.width=Math.max(2000,x+200)+'px';
-}
-function recalcColPositions(){
-  normalizeColWidths();
 }
 function rebuildCols(){
   document.querySelectorAll('.col,.col-label').forEach(el=>el.remove());
@@ -1448,7 +1457,7 @@ loadLatestCloudView().catch(err=>setAiStatus(`Could not load latest saved view: 
     {
       sel:'.side',placement:'right',
       title:'Inspector & Options',
-      text:'Use the Inspector to edit selected boxes and connections. Straight connector bends can be nudged with arrows, and AQF columns stay equal width.'
+      text:'Use the Inspector to edit selected boxes and connections. Straight connector bends can be nudged with arrows, and AQF column labels and widths can be edited in the Columns section.'
     },
     {
       target:null,placement:'center',last:true,
