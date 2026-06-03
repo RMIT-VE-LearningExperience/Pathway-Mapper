@@ -142,6 +142,9 @@
   .ai-actions .small-add{margin-top:0}
   .ai-status{font-size:11px;color:var(--muted);line-height:1.35;margin-top:8px;min-height:15px}
   .ai-status.err{color:#c0392b}
+  .contact-footer{font-size:11px;color:var(--muted);line-height:1.45;border-top:1px solid var(--line);margin-top:18px;padding-top:12px}
+  .contact-footer a{color:var(--accent);font-weight:600;text-decoration:none}
+  .contact-footer a:hover{text-decoration:underline}
 </style>
 </head>
 <body>
@@ -232,6 +235,11 @@
       • Click a box or line to edit its properties here.<br>
       • <span class="kbd">Del</span> or the Delete button removes the selection.<br>
       • <b>Export PDF</b> captures the full map with your title.
+    </div>
+
+    <div class="contact-footer">
+      Built by Digital Media Design Team - Learning &amp; Teaching Innovation Team - CoVE.<br>
+      Contact <a href="mailto:dmd.cove@rmit.edu.au">dmd.cove@rmit.edu.au</a>
     </div>
   </aside>
 
@@ -768,6 +776,7 @@ document.getElementById('fileIn').onchange=e=>{
 // ===== cloud saved views =====
 const VIEW_API='https://pathway-editor-views.lawrence-makoona.workers.dev';
 const EDITOR_ID='ft';
+const AI_CONTACT_MESSAGE='AI Assist is currently unavailable. Please contact dmd.cove@rmit.edu.au to reactivate the API capabilities.';
 function currentViewData(){return{cols:COLS,styles:STYLES,nodes,edges,lineRouting};}
 function applyViewData(d){
   if(!d||!Array.isArray(d.cols)||!Array.isArray(d.nodes)||!Array.isArray(d.edges))throw new Error('Invalid view data');
@@ -808,7 +817,10 @@ async function generatePathwayDraft(){
       body:JSON.stringify({editor:EDITOR_ID,title:currentViewName(),prompt:input.prompt,text:input.text,current:currentViewData()})
     });
     const result=await res.json();
-    if(!res.ok)throw new Error(result.error||'Could not generate pathway');
+    if(!res.ok){
+      if(result.error==='VAL_AUTH_EXPIRED')throw new Error(AI_CONTACT_MESSAGE);
+      throw new Error(result.error||'Could not generate pathway');
+    }
     if(!confirm(`Replace the current canvas with "${result.title||'generated pathway'}"?`))return;
     if(result.title)document.querySelector('header h1').textContent=result.title;
     if(result.badge)document.querySelector('header .badge').textContent=result.badge;

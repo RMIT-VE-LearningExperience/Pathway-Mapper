@@ -305,6 +305,9 @@ async function callVal(env, input) {
 
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      throw new Error("VAL_AUTH_EXPIRED");
+    }
     const detail = payload.error?.message || payload.detail || `VAL request failed with ${res.status}`;
     return Promise.reject(new Error(detail));
   }
