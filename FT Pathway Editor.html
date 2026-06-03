@@ -26,6 +26,9 @@
   button.tool:hover{border-color:var(--accent);color:var(--accent)}
   button.tool.active{background:var(--accent);color:#fff;border-color:var(--accent)}
   button.tool.danger:hover{border-color:#c0392b;color:#c0392b}
+  button.tool.loading{position:relative;color:transparent;pointer-events:none}
+  button.tool.loading::after{content:"";position:absolute;inset:0;margin:auto;width:14px;height:14px;border:2px solid #dfe5ec;border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
   button.ai-tool{width:36px;height:36px;padding:5px;border-radius:8px;display:flex;align-items:center;justify-content:center}
   button.ai-tool img{width:24px;height:24px;display:block}
   /* ---- layout ---- */
@@ -301,11 +304,12 @@ const svg=document.getElementById('edges');
 const host=document.getElementById('host');
 
 // ---- AQF columns ----
+const COL_WIDTH=230;
 const COLS=[
-  {id:4,label:"AQF Level 4",x:20,w:200},
-  {id:5,label:"AQF Level 5",x:235,w:185},
-  {id:6,label:"AQF Level 6",x:435,w:215},
-  {id:7,label:"AQF Level 7",x:665,w:215},
+  {id:4,label:"AQF Level 4",x:20,w:COL_WIDTH},
+  {id:5,label:"AQF Level 5",x:270,w:COL_WIDTH},
+  {id:6,label:"AQF Level 6",x:520,w:COL_WIDTH},
+  {id:7,label:"AQF Level 7",x:770,w:COL_WIDTH},
 ];
 
 const STYLES={
@@ -685,7 +689,7 @@ document.getElementById('addBtn').onclick=()=>{
   nodes.push(n); renderNodes(); renderEdges(); selectNode(n.id);
 };
 function setLink(on){linkMode=on;linkFrom=null;host.style.cursor=on?'crosshair':'';}
-document.getElementById('delBtn').onclick=del;
+document.getElementById('delBtn').onclick=deleteWithFeedback;
 // Export dropdown
 document.getElementById('mapSwBtn').onclick=e=>{e.stopPropagation();document.getElementById('mapSw').classList.toggle('open');};
 document.getElementById('createNewMapBtn').onclick=e=>{e.stopPropagation();createNewMap();document.getElementById('mapSw').classList.remove('open');};
@@ -700,7 +704,7 @@ document.querySelectorAll('#expGroup .exp-menu button,#viewsGroup .exp-menu butt
   document.getElementById('expGroup').classList.remove('open');
   document.getElementById('viewsGroup').classList.remove('open');
 }));
-function del(){
+function deleteSelection(){
   if(selNodes.size>0){
     const ids=[...selNodes];
     nodes=nodes.filter(n=>!ids.includes(n.id));
@@ -708,6 +712,17 @@ function del(){
     selNodes.clear();selNode=null;
   }else if(selEdge){edges=edges.filter(e=>e.id!==selEdge);selEdge=null;}
   renderNodes();renderEdges();inspect();
+}
+function deleteWithFeedback(){
+  if(!selNode&&!selEdge&&!selNodes.size)return;
+  const btn=document.getElementById('delBtn');
+  btn.classList.add('loading');
+  btn.disabled=true;
+  setTimeout(()=>{
+    deleteSelection();
+    btn.classList.remove('loading');
+    btn.disabled=false;
+  },180);
 }
 function createNewMap(){
   if(!confirm('Create a new blank map? Unsaved changes on this canvas will be cleared.'))return;
@@ -719,8 +734,8 @@ function createNewMap(){
   host.scrollTo({left:0,top:0});
   renderNodes();renderEdges();inspect();
 }
-document.addEventListener('keydown',e=>{if((e.key==='Delete'||e.key==='Backspace')&&(selNode||selEdge)){
-  if(isEditingText())return;del();}
+document.addEventListener('keydown',e=>{if((e.key==='Delete'||e.key==='Backspace')&&(selNode||selEdge||selNodes.size)){
+  if(isEditingText())return;deleteWithFeedback();}
   if(selNodes.size>0&&!selEdge&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){
     if(isEditingText())return;
     e.preventDefault();
@@ -784,6 +799,7 @@ function applyViewData(d){
   Object.keys(STYLES).forEach(k=>delete STYLES[k]);
   Object.assign(STYLES,d.styles||{});
   nodes=d.nodes||[];edges=d.edges||[];
+  normalizeColWidths();
   if(d.lineRouting){lineRouting=d.lineRouting;document.getElementById('lineRouting').value=lineRouting;}
   syncCounters();clearSel();rebuildCols();renderNodes();renderEdges();renderLegend();inspect();renderColEditor();
 }
@@ -1306,18 +1322,30 @@ function renderColEditor(){
 document.getElementById('addColBtn').onclick=()=>{
   const lastCol=COLS[COLS.length-1];
   const newId=(lastCol?lastCol.id:0)+1;
-  COLS.push({id:newId,label:'New Level',x:(lastCol?lastCol.x+lastCol.w:0)+20,w:230});
+  COLS.push({id:newId,label:'New Level',x:(lastCol?lastCol.x+lastCol.w:0)+20,w:COL_WIDTH});
   recalcColPositions();
   rebuildCols();
   // Update node inspector AQF dropdown
   inspect();
   renderColEditor();
 };
-function recalcColPositions(){
+function normalizeColWidths(){
+  const previous=COLS.map(c=>({id:c.id,x:Number(c.x)||20,w:Number(c.w)||COL_WIDTH}));
   let x=20;
-  COLS.forEach(c=>{c.x=x;x+=c.w+20;});
-  // Widen board to fit
+  COLS.forEach(c=>{c.w=COL_WIDTH;c.x=x;x+=COL_WIDTH+20;});
+  nodes.forEach(n=>{
+    const col=COLS.find(c=>c.id===n.col);
+    const old=previous.find(c=>c.id===n.col);
+    if(!col)return;
+    const base=old?old.x:col.x;
+    const maxOffset=Math.max(0,COL_WIDTH-(n.w||184));
+    const offset=Math.max(0,Math.min((Number(n.x)||base+15)-base,maxOffset));
+    n.x=col.x+offset;
+  });
   board.style.width=Math.max(2000,x+200)+'px';
+}
+function recalcColPositions(){
+  normalizeColWidths();
 }
 function rebuildCols(){
   document.querySelectorAll('.col,.col-label').forEach(el=>el.remove());
@@ -1380,36 +1408,47 @@ loadLatestCloudView().catch(err=>setAiStatus(`Could not load latest saved view: 
 
 <script>
 (function(){
+  const TOUR_VERSION='2026-06-03-ui-refresh';
   const STEPS=[
     {
       target:null,placement:'center',
       title:'Welcome to Pathways Editor',
-      text:'This quick tour walks you through the key features. Click Next to begin, or Skip to jump straight in.'
+      text:'This quick tour covers the current editing, AI, saved views, movement, and export tools.'
     },
     {
       els:['header .badge','header h1'],placement:'bottom-left',
-      title:'Editable Title & Code',
-      text:'Click the red badge to change the course code, or click the title to rename the map. Both update in your PDF exports.'
+      title:'Latest Saved View',
+      text:'The editor loads the newest saved view automatically when it opens. Click the red badge or title to rename the current map.'
+    },
+    {
+      sel:'#aiTopBtn',placement:'bottom',
+      title:'AI Assist',
+      text:'Click the VAL icon to jump to AI Assist. Paste pathway notes or upload a text file, then generate a draft map.'
+    },
+    {
+      sel:'#viewsGroup',placement:'bottom',
+      title:'Saved Views',
+      text:'Use Views to save the current layout, load a saved view from the list, or delete views you created in this browser.'
     },
     {
       sel:'#addBtn',placement:'bottom',
       title:'Add a Box',
-      text:'Creates a new course or qualification on the canvas. Drag it into position and use the Inspector panel to fill in the title, code, and colour.'
+      text:'Creates a new course or qualification. Drag it into position, or use arrow keys to move selected boxes by quarter-grid steps.'
     },
     {
       sel:'#delBtn',placement:'bottom',
-      title:'Connecting & Deleting',
-      text:'Hover a box to reveal its connection dots, then drag from one dot to another box to draw an arrow. Shift+click to multi-select, then Delete removes them all.'
+      title:'Delete Feedback',
+      text:'Select a box or connection, then click Delete or press the Delete key. A short loading spinner shows while the item is removed.'
     },
     {
       sel:'#expGroup',placement:'bottom',
       title:'Export',
-      text:'Click Export ▾ for PDF, PNG, Slide (16:9 PowerPoint), or JSON. Import JSON to reload a saved map.'
+      text:'Export to PDF, PNG, Slide, or JSON. PNG and PDF exports now wrap long legend labels onto extra rows.'
     },
     {
       sel:'.side',placement:'right',
       title:'Inspector & Options',
-      text:'Click any box or connection to select it — its properties appear here for editing: title, course code, colour, and connection type. The Columns section lets you rename or add AQF levels.'
+      text:'Use the Inspector to edit selected boxes and connections. Straight connector bends can be nudged with arrows, and AQF columns stay equal width.'
     },
     {
       target:null,placement:'center',last:true,
@@ -1508,6 +1547,7 @@ loadLatestCloudView().catch(err=>setAiStatus(`Could not load latest saved view: 
     spotlight.classList.add('hidden');
     card.style.display='none';
     localStorage.setItem('pathway-tour-done','1');
+    localStorage.setItem('pathway-tour-version',TOUR_VERSION);
   }
 
   nextBtn.onclick=()=>{ if(step>=STEPS.length-1){endTour();return;} step++; renderStep(); };
@@ -1527,8 +1567,8 @@ loadLatestCloudView().catch(err=>setAiStatus(`Could not load latest saved view: 
   helpBtn.onclick=startTour;
   document.querySelector('header .spacer').insertAdjacentElement('afterend',helpBtn);
 
-  // Auto-start for first-time visitors
-  if(!localStorage.getItem('pathway-tour-done')) startTour();
+  // Auto-start for first-time visitors or when the tour content changes
+  if(localStorage.getItem('pathway-tour-version')!==TOUR_VERSION) startTour();
 })();
 </script>
 

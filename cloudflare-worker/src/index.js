@@ -394,20 +394,21 @@ function findBestColumn(cols, aqfLevel) {
 }
 
 function defaultCols(editor) {
+  const w = 230;
   if (editor === "ft") {
     return [
-      { id: 4, label: "AQF Level 4", x: 20, w: 200 },
-      { id: 5, label: "AQF Level 5", x: 240, w: 230 },
-      { id: 6, label: "AQF Level 6", x: 490, w: 230 },
-      { id: 7, label: "AQF Level 7", x: 740, w: 230 }
+      { id: 4, label: "AQF Level 4", x: 20, w },
+      { id: 5, label: "AQF Level 5", x: 270, w },
+      { id: 6, label: "AQF Level 6", x: 520, w },
+      { id: 7, label: "AQF Level 7", x: 770, w }
     ];
   }
   return [
-    { id: 3, label: "AQF Level 3", x: 20, w: 190 },
-    { id: 4, label: "AQF Level 4", x: 225, w: 210 },
-    { id: 5, label: "AQF Level 5", x: 450, w: 210 },
-    { id: 6, label: "AQF Level 6", x: 675, w: 210 },
-    { id: 7, label: "AQF Level 7", x: 900, w: 210 }
+    { id: 3, label: "AQF Level 3", x: 20, w },
+    { id: 4, label: "AQF Level 4", x: 270, w },
+    { id: 5, label: "AQF Level 5", x: 520, w },
+    { id: 6, label: "AQF Level 6", x: 770, w },
+    { id: 7, label: "AQF Level 7", x: 1020, w }
   ];
 }
 
