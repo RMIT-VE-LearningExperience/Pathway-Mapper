@@ -377,6 +377,7 @@ function renderEdges(){
 
 // ===== drag / link state (single global handler, not per-render) =====
 let drag=null, dragNode=null, dragEl=null;
+let multiDragOffsets=[];
 
 function boardXY(ev){
   const r=host.getBoundingClientRect();
@@ -387,13 +388,22 @@ function boardXY(ev){
 window.addEventListener('mousemove',ev=>{
   if(!drag) return;
   const p=boardXY(ev);
-  dragNode.x=Math.round((p.x-drag.dx)/14)*14;
-  dragNode.y=Math.round((p.y-drag.dy)/14)*14;
-  dragEl.style.left=dragNode.x+'px'; dragEl.style.top=dragNode.y+'px';
+  if(multiDragOffsets.length>1){
+    multiDragOffsets.forEach(({node,dx,dy})=>{
+      node.x=Math.round((p.x-dx)/14)*14;
+      node.y=Math.round((p.y-dy)/14)*14;
+      const el=document.querySelector(`.node[data-id="${node.id}"]`);
+      if(el){el.style.left=node.x+'px';el.style.top=node.y+'px';}
+    });
+  }else{
+    dragNode.x=Math.round((p.x-drag.dx)/14)*14;
+    dragNode.y=Math.round((p.y-drag.dy)/14)*14;
+    dragEl.style.left=dragNode.x+'px'; dragEl.style.top=dragNode.y+'px';
+  }
   renderEdges();
 });
 window.addEventListener('mouseup',()=>{
-  if(drag){drag=null;if(dragEl)dragEl.style.cursor='grab';dragEl=null;dragNode=null;}
+  if(drag){drag=null;multiDragOffsets=[];if(dragEl)dragEl.style.cursor='grab';dragEl=null;dragNode=null;}
 });
 
 // ===== ghost link line =====
@@ -429,6 +439,18 @@ function attachNode(el,n){
     if(ev.target.classList.contains('port')) return;
     if(linkMode) return;
     if(ev.shiftKey){selectNode(n.id,true);return;}
+    const p=boardXY(ev);
+    if(selNodes.size>1&&selNodes.has(n.id)){
+      multiDragOffsets=[...selNodes].map(id=>{
+        const node=nodes.find(x=>x.id===id);
+        return{node,dx:p.x-node.x,dy:p.y-node.y};
+      });
+      dragNode=n;dragEl=document.querySelector(`.node[data-id="${n.id}"]`);
+      drag={dx:p.x-n.x,dy:p.y-n.y};
+      document.querySelectorAll('.node.sel').forEach(el=>el.style.cursor='grabbing');
+      return;
+    }
+    multiDragOffsets=[];
     dragNode=n;
     selectNode(n.id);
     dragEl=document.querySelector(`.node[data-id="${n.id}"]`);
