@@ -100,6 +100,13 @@
 <header>
   <span class="badge" contenteditable="true" title="Click to edit">525T</span>
   <h1 contenteditable="true" title="Click to edit">Future Technologies — Pathways Editor</h1>
+  <div class="map-sw" id="mapSw">
+    <button class="map-sw-btn" id="mapSwBtn">Future Technologies ▾</button>
+    <div class="map-sw-menu">
+      <a class="map-sw-item" href="Pathway%20Editor%20Compact.html">Creative Industries</a>
+      <span class="map-sw-item current">Future Technologies</span>
+    </div>
+  </div>
   <div class="spacer"></div>
   <button class="tool" id="addBtn">＋ Add box</button>
   <button class="tool danger" id="delBtn">✕ Delete</button>
@@ -572,8 +579,9 @@ document.getElementById('addBtn').onclick=()=>{
 function setLink(on){linkMode=on;linkFrom=null;host.style.cursor=on?'crosshair':'';}
 document.getElementById('delBtn').onclick=del;
 // Export dropdown
+document.getElementById('mapSwBtn').onclick=e=>{e.stopPropagation();document.getElementById('mapSw').classList.toggle('open');};
 document.getElementById('expBtn').onclick=e=>{e.stopPropagation();document.getElementById('expGroup').classList.toggle('open');};
-document.addEventListener('click',()=>document.getElementById('expGroup').classList.remove('open'));
+document.addEventListener('click',()=>{document.getElementById('expGroup').classList.remove('open');document.getElementById('mapSw').classList.remove('open');});
 document.querySelectorAll('.exp-menu button').forEach(b=>b.addEventListener('click',()=>document.getElementById('expGroup').classList.remove('open')));
 function del(){
   if(selNodes.size>0){
