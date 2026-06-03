@@ -106,7 +106,7 @@
   .map-sw-btn:hover{border-color:var(--accent);color:var(--accent)}
   .map-sw-menu{position:absolute;top:calc(100% + 6px);left:0;background:#fff;
     border:1px solid var(--line);border-radius:10px;
-    box-shadow:0 4px 16px rgba(20,30,45,.13);min-width:190px;z-index:200;
+    box-shadow:0 4px 16px rgba(20,30,45,.13);min-width:230px;max-height:70vh;overflow:auto;z-index:200;
     display:none;flex-direction:column;padding:4px}
   .map-sw.open .map-sw-menu{display:flex}
   .map-sw-item{font:inherit;font-size:12.5px;font-weight:600;padding:8px 14px;
@@ -115,6 +115,9 @@
   .map-sw-item:hover{background:#f4f6f9;color:var(--accent)}
   .map-sw-item.current{color:var(--accent);background:#fef5f3;cursor:default}
   .map-sw-sep{border:none;border-top:1px solid var(--line);margin:4px 8px}
+  .map-sw-saved-title{font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);padding:7px 14px 3px}
+  .map-sw-saved .map-sw-item{font-weight:500}
+  .map-sw-meta{display:block;font-size:10px;color:var(--muted);margin-top:2px;font-weight:400}
   /* ---- export dropdown ---- */
   .exp-group{position:relative;display:inline-block}
   .exp-menu{position:absolute;top:calc(100% + 6px);right:0;background:#fff;
@@ -161,6 +164,7 @@
     <div class="map-sw-menu">
       <span class="map-sw-item current">Creative Industries</span>
       <a class="map-sw-item" href="FT%20Pathway%20Editor.html">Future Technologies</a>
+      <div class="map-sw-saved" id="savedMapViews"></div>
       <hr class="map-sw-sep">
       <button class="map-sw-item" id="createNewMapBtn">Create new</button>
     </div>
@@ -691,7 +695,12 @@ document.getElementById('addBtn').onclick=()=>{
 function setLink(on){linkMode=on;linkFrom=null;host.style.cursor=on?'crosshair':'';}
 document.getElementById('delBtn').onclick=deleteWithFeedback;
 // Export dropdown
-document.getElementById('mapSwBtn').onclick=e=>{e.stopPropagation();document.getElementById('mapSw').classList.toggle('open');};
+document.getElementById('mapSwBtn').onclick=e=>{
+  e.stopPropagation();
+  const sw=document.getElementById('mapSw');
+  sw.classList.toggle('open');
+  if(sw.classList.contains('open'))refreshMapSwitcherViews().catch(()=>{});
+};
 document.getElementById('createNewMapBtn').onclick=e=>{e.stopPropagation();createNewMap();document.getElementById('mapSw').classList.remove('open');};
 document.getElementById('expBtn').onclick=e=>{e.stopPropagation();document.getElementById('expGroup').classList.toggle('open');};
 document.getElementById('viewsBtn').onclick=e=>{e.stopPropagation();document.getElementById('viewsGroup').classList.toggle('open');};
@@ -858,7 +867,9 @@ async function saveCloudView(){
   const saved=await res.json();
   if(!res.ok)throw new Error(saved.error||'Save failed');
   localStorage.setItem(`pathway-view-token:${saved.id}`,saved.editToken);
+  await refreshMapSwitcherViews();
   alert(`Saved "${saved.name}".\nView ID: ${saved.id}`);
+  document.getElementById('mapSw').classList.add('open');
 }
 async function loadCloudView(){
   const res=await fetch(`${VIEW_API}/views?editor=${encodeURIComponent(EDITOR_ID)}`);
@@ -875,6 +886,7 @@ async function loadCloudViewById(id){
   if(view.title)document.querySelector('header h1').textContent=view.title;
   if(view.badge)document.querySelector('header .badge').textContent=view.badge;
   applyViewData(view.data);
+  document.getElementById('mapSw').classList.remove('open');
   closeViewList();
 }
 async function loadLatestCloudView(){
@@ -901,8 +913,28 @@ async function deleteCloudView(id,name){
   const refreshed=await fetch(`${VIEW_API}/views?editor=${encodeURIComponent(EDITOR_ID)}`);
   const list=await refreshed.json();
   if(!refreshed.ok)throw new Error(list.error||'Could not refresh views');
+  await refreshMapSwitcherViews(list.views);
   if(!list.views.length){closeViewList();return;}
   renderViewList(list.views);
+}
+async function refreshMapSwitcherViews(existingViews){
+  const box=document.getElementById('savedMapViews');
+  if(!box)return;
+  let views=existingViews;
+  if(!views){
+    const res=await fetch(`${VIEW_API}/views?editor=${encodeURIComponent(EDITOR_ID)}&t=${Date.now()}`,{cache:'no-store'});
+    const list=await res.json();
+    if(!res.ok)throw new Error(list.error||'Could not load saved views');
+    views=list.views||[];
+  }
+  box.innerHTML=views.length?`<div class="map-sw-saved-title">Saved views</div>`+views.slice(0,12).map(v=>`
+    <button class="map-sw-item saved-map-item" data-view-id="${esc(v.id)}">
+      ${esc(v.name||'Untitled view')}
+      <span class="map-sw-meta">${esc((v.updatedAt||'').slice(0,10))}</span>
+    </button>`).join(''):'';
+  box.querySelectorAll('.saved-map-item').forEach(btn=>{
+    btn.onclick=e=>{e.stopPropagation();loadCloudViewById(btn.dataset.viewId).catch(err=>alert(err.message));};
+  });
 }
 function ensureViewModal(){
   if(document.getElementById('viewModal'))return;
@@ -1362,6 +1394,7 @@ function rebuildCols(){
 // ===== boot =====
 seed();rebuildCols();renderNodes();renderEdges();renderLegend();inspect();renderColEditor();
 loadLatestCloudView().catch(err=>setAiStatus(`Could not load latest saved view: ${err.message}`,true));
+refreshMapSwitcherViews().catch(()=>{});
 </script>
 
 <!-- ===== ONBOARDING TOUR ===== -->
