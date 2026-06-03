@@ -153,8 +153,8 @@
     <h2>Options</h2>
     <label class="fld">Line routing</label>
     <select id="lineRouting">
-      <option value="curved" selected>Curved</option>
-      <option value="straight">Straight</option>
+      <option value="straight" selected>Straight</option>
+      <option value="curved">Curved</option>
     </select>
 
     <h2>Columns</h2>
@@ -258,7 +258,7 @@ function syncCounters(){
 let selNode=null, selEdge=null;
 let selNodes=new Set();
 let linkMode=false, linkFrom=null;
-let lineRouting='curved';
+let lineRouting='straight';
 
 // ===== seed: Creative Industries map =====
 function seed(){
@@ -622,9 +622,17 @@ function del(){
   renderNodes();renderEdges();inspect();
 }
 document.addEventListener('keydown',e=>{if((e.key==='Delete'||e.key==='Backspace')&&(selNode||selEdge)){
-  if(document.activeElement.tagName==='INPUT'||document.activeElement.tagName==='TEXTAREA')return;del();}
+  if(isEditingText())return;del();}
+  if(selNodes.size>0&&!selEdge&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){
+    if(isEditingText())return;
+    e.preventDefault();
+    const step=e.shiftKey?28:14;
+    const dx=e.key==='ArrowLeft'?-step:e.key==='ArrowRight'?step:0;
+    const dy=e.key==='ArrowUp'?-step:e.key==='ArrowDown'?step:0;
+    nudgeSelectedNodes(dx,dy);
+  }
   if(selEdge&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){
-    if(document.activeElement.tagName==='INPUT'||document.activeElement.tagName==='TEXTAREA')return;
+    if(isEditingText())return;
     e.preventDefault();
     const step=e.shiftKey?28:14;
     const edge=edges.find(x=>x.id===selEdge);
@@ -634,6 +642,17 @@ document.addEventListener('keydown',e=>{if((e.key==='Delete'||e.key==='Backspace
   }
   if(e.key==='Escape')clearSel();});
 host.addEventListener('click',()=>clearSel());
+function isEditingText(){
+  const el=document.activeElement;
+  return el&&(['INPUT','TEXTAREA','SELECT'].includes(el.tagName)||el.isContentEditable);
+}
+function nudgeSelectedNodes(dx,dy){
+  [...selNodes].forEach(id=>{
+    const n=nodes.find(x=>x.id===id);
+    if(n){n.x=Math.max(0,n.x+dx);n.y=Math.max(0,n.y+dy);}
+  });
+  renderNodes();renderEdges();
+}
 function nudgeEdge(edge,dx,dy){
   edge.bendX=(edge.bendX||0)+dx;
   edge.bendY=(edge.bendY||0)+dy;
