@@ -847,6 +847,19 @@ async function loadCloudViewById(id){
   applyViewData(view.data);
   closeViewList();
 }
+async function loadLatestCloudView(){
+  const res=await fetch(`${VIEW_API}/views?editor=${encodeURIComponent(EDITOR_ID)}&t=${Date.now()}`,{cache:'no-store'});
+  const list=await res.json();
+  if(!res.ok)throw new Error(list.error||'Could not check saved views');
+  const latest=list.views&&list.views[0];
+  if(!latest)return;
+  const viewRes=await fetch(`${VIEW_API}/views/${encodeURIComponent(latest.id)}?t=${Date.now()}`,{cache:'no-store'});
+  const view=await viewRes.json();
+  if(!viewRes.ok)throw new Error(view.error||'Could not load latest view');
+  if(view.title)document.querySelector('header h1').textContent=view.title;
+  if(view.badge)document.querySelector('header .badge').textContent=view.badge;
+  applyViewData(view.data);
+}
 async function deleteCloudView(id,name){
   const token=localStorage.getItem(`pathway-view-token:${id}`);
   if(!token){alert('This browser can only delete views it saved.');return;}
@@ -1295,6 +1308,7 @@ function rebuildCols(){
 
 // ===== boot =====
 seed();rebuildCols();renderNodes();renderEdges();renderLegend();inspect();renderColEditor();
+loadLatestCloudView().catch(err=>setAiStatus(`Could not load latest saved view: ${err.message}`,true));
 </script>
 
 <!-- ===== ONBOARDING TOUR ===== -->
