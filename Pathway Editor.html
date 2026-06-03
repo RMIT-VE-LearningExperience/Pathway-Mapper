@@ -84,8 +84,8 @@
 </head>
 <body>
 <header>
-  <span class="badge">515T</span>
-  <h1>Creative Industries — Pathways Editor</h1>
+  <span class="badge" contenteditable="true" title="Click to edit">515T</span>
+  <h1 contenteditable="true" title="Click to edit">Creative Industries — Pathways Editor</h1>
   <div class="spacer"></div>
   <button class="tool" id="addBtn">＋ Add box</button>
   <button class="tool" id="linkBtn">↳ Link mode</button>
@@ -130,11 +130,12 @@
 
     <h2>How to use</h2>
     <div class="hint">
-      • <b>Drag</b> a box to move it.<br>
-      • <b>Link mode</b> then hover a box and drag from its dot to another box to connect.<br>
-      • Click a box or line to edit it here.<br>
-      • <span class="kbd">Del</span> / Delete button removes the selection.<br>
-      • Export to <b>JSON</b> (re-importable) or standalone <b>HTML</b>.
+      • Click the <b>badge</b> or <b>title</b> in the header to rename them.<br>
+      • <b>Drag</b> a box to reposition it on the canvas.<br>
+      • <b>Link mode</b> → hover a box → drag from its dot to another box.<br>
+      • Click a box or line to edit its properties here.<br>
+      • <span class="kbd">Del</span> or the Delete button removes the selection.<br>
+      • <b>Export PDF</b> captures the full map with your title.
     </div>
   </aside>
 
@@ -794,5 +795,212 @@ function rebuildCols(){
 seed();renderCols();renderNodes();renderEdges();renderLegend();inspect();renderColEditor();
 </script>
 
+<!-- ===== ONBOARDING TOUR ===== -->
+<style>
+#tour-overlay{position:fixed;inset:0;z-index:9000;pointer-events:none}
+#tour-overlay.active{pointer-events:all}
+#tour-spotlight{
+  position:fixed;border-radius:10px;pointer-events:none;z-index:9001;
+  box-shadow:0 0 0 5px rgba(255,255,255,.85),0 0 0 9999px rgba(15,25,40,.6);
+  transition:top .32s ease,left .32s ease,width .32s ease,height .32s ease,opacity .2s;
+}
+#tour-spotlight.hidden{opacity:0;pointer-events:none;box-shadow:none}
+#tour-card{
+  position:fixed;z-index:9002;background:#fff;border-radius:14px;
+  padding:22px 24px 18px;width:300px;
+  box-shadow:0 16px 48px rgba(0,0,0,.2),0 2px 8px rgba(0,0,0,.08);
+  transition:top .32s ease,left .32s ease;
+}
+#tour-card h3{margin:0 0 8px;font-size:15px;font-weight:700;color:#1d2530}
+#tour-card p{margin:0 0 18px;font-size:13px;color:#4a5568;line-height:1.6}
+#tour-step-lbl{font-size:10px;color:#aab4c2;font-weight:700;letter-spacing:.6px;text-transform:uppercase;margin-bottom:6px}
+.t-footer{display:flex;align-items:center;gap:6px}
+.t-dots{flex:1;display:flex;gap:5px;align-items:center}
+.t-dot{width:7px;height:7px;border-radius:50%;background:#dfe5ec;transition:background .2s,transform .2s;flex-shrink:0}
+.t-dot.on{background:#d4543a;transform:scale(1.25)}
+.t-btn{font:inherit;font-size:12.5px;font-weight:600;border-radius:8px;cursor:pointer;padding:7px 14px;transition:.15s;white-space:nowrap}
+.t-btn.tnext{background:#d4543a;color:#fff;border:none}
+.t-btn.tnext:hover{background:#b8432c}
+.t-btn.tprev{background:none;border:1px solid #dfe5ec;color:#6b7785;font-size:12px}
+.t-btn.tprev:hover{border-color:#aaa;color:#333}
+.t-btn.tskip{background:none;border:none;color:#bbc3ce;font-size:12px;padding:7px 6px}
+.t-btn.tskip:hover{color:#666}
+#tour-help-btn{font:inherit;font-size:12px;font-weight:600;border:1px solid #dfe5ec;background:#fff;
+  color:#6b7785;padding:6px 11px;border-radius:8px;cursor:pointer;transition:.15s;margin-left:4px}
+#tour-help-btn:hover{border-color:#d4543a;color:#d4543a}
+</style>
+
+<div id="tour-overlay"></div>
+<div id="tour-spotlight" class="hidden"></div>
+<div id="tour-card" style="display:none">
+  <div id="tour-step-lbl"></div>
+  <h3 id="tour-title"></h3>
+  <p id="tour-text"></p>
+  <div class="t-footer">
+    <div class="t-dots" id="tour-dots"></div>
+    <button class="t-btn tskip" id="tour-skip">Skip</button>
+    <button class="t-btn tprev" id="tour-prev" style="display:none">Back</button>
+    <button class="t-btn tnext" id="tour-next">Next →</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  const STEPS=[
+    {
+      target:null,placement:'center',
+      title:'Welcome to Pathways Editor',
+      text:'This quick tour walks you through the key features. Click Next to begin, or Skip to jump straight in.'
+    },
+    {
+      els:['header .badge','header h1'],placement:'bottom-left',
+      title:'Editable Title & Code',
+      text:'Click the red badge to change the course code, or click the title to rename the map. Both update in your PDF exports.'
+    },
+    {
+      sel:'#addBtn',placement:'bottom',
+      title:'Add a Box',
+      text:'Creates a new course or qualification on the canvas. Drag it into position and use the Inspector panel to fill in the title, code, and colour.'
+    },
+    {
+      sel:'#linkBtn',placement:'bottom',
+      title:'Link Mode',
+      text:'Activate Link mode, then hover over a box until the connection dots appear on its sides. Drag from one dot to another box to draw a pathway arrow.'
+    },
+    {
+      sel:'#delBtn',placement:'bottom',
+      title:'Delete',
+      text:'Select any box or connection on the canvas, then click Delete or press the Del key to remove it.'
+    },
+    {
+      sel:'#expPdf',placement:'bottom',
+      title:'Export to PDF',
+      text:'Renders your full pathway map as a high-quality PDF, including the title and course code from the editable header.'
+    },
+    {
+      sel:'.side',placement:'right',
+      title:'Inspector & Options',
+      text:'Click any box or connection to select it — its properties appear here for editing: title, course code, colour, and connection type. The Columns section lets you rename or add AQF levels.'
+    },
+    {
+      target:null,placement:'center',last:true,
+      title:"You're all set!",
+      text:'Start building your pathway map. Reopen this tour anytime with the ? Tour button in the toolbar.'
+    },
+  ];
+
+  let step=0;
+  const overlay  = document.getElementById('tour-overlay');
+  const spotlight= document.getElementById('tour-spotlight');
+  const card     = document.getElementById('tour-card');
+  const stepLbl  = document.getElementById('tour-step-lbl');
+  const titleEl  = document.getElementById('tour-title');
+  const textEl   = document.getElementById('tour-text');
+  const dotsEl   = document.getElementById('tour-dots');
+  const skipBtn  = document.getElementById('tour-skip');
+  const prevBtn  = document.getElementById('tour-prev');
+  const nextBtn  = document.getElementById('tour-next');
+
+  function getRect(s){
+    if(s.target===null && !s.els && !s.sel) return null;
+    if(s.els){
+      const rects=s.els.map(q=>document.querySelector(q)?.getBoundingClientRect()).filter(Boolean);
+      if(!rects.length) return null;
+      const top=Math.min(...rects.map(r=>r.top));
+      const left=Math.min(...rects.map(r=>r.left));
+      const bottom=Math.max(...rects.map(r=>r.bottom));
+      const right=Math.max(...rects.map(r=>r.right));
+      return {top,left,bottom,right,width:right-left,height:bottom-top};
+    }
+    if(s.sel){
+      const el=document.querySelector(s.sel);
+      return el?el.getBoundingClientRect():null;
+    }
+    return null;
+  }
+
+  function placeCard(rect,placement){
+    const PAD=14, CW=300, vh=window.innerHeight, vw=window.innerWidth;
+    let top,left;
+    if(!rect||placement==='center'){
+      top=vh/2-120; left=vw/2-CW/2;
+    } else if(placement==='bottom'||placement==='bottom-left'){
+      top=rect.bottom+PAD;
+      left=placement==='bottom-left'?rect.left:rect.left+rect.width/2-CW/2;
+      left=Math.max(PAD,Math.min(left,vw-CW-PAD));
+      if(top+220>vh) top=rect.top-220-PAD;
+    } else if(placement==='right'){
+      top=rect.top+rect.height/2-110;
+      left=rect.right+PAD;
+      if(left+CW>vw) left=rect.left-CW-PAD;
+      top=Math.max(PAD,Math.min(top,vh-240));
+    }
+    card.style.top=top+'px';
+    card.style.left=left+'px';
+  }
+
+  function renderStep(){
+    const s=STEPS[step];
+    const rect=getRect(s);
+    const PAD=10;
+    if(rect){
+      spotlight.style.top=(rect.top-PAD)+'px';
+      spotlight.style.left=(rect.left-PAD)+'px';
+      spotlight.style.width=(rect.width+PAD*2)+'px';
+      spotlight.style.height=(rect.height+PAD*2)+'px';
+      spotlight.classList.remove('hidden');
+    } else {
+      spotlight.classList.add('hidden');
+    }
+    placeCard(rect,s.placement);
+    const total=STEPS.length;
+    stepLbl.textContent=s.last?'':('Step '+(step+1)+' of '+total);
+    titleEl.textContent=s.title;
+    textEl.textContent=s.text;
+    nextBtn.textContent=s.last?'Get started ✓':'Next →';
+    prevBtn.style.display=step>0?'':'none';
+    dotsEl.innerHTML='';
+    STEPS.forEach((_,i)=>{
+      const d=document.createElement('div');
+      d.className='t-dot'+(i===step?' on':'');
+      dotsEl.appendChild(d);
+    });
+  }
+
+  function startTour(){
+    step=0;
+    overlay.classList.add('active');
+    card.style.display='block';
+    renderStep();
+  }
+
+  function endTour(){
+    overlay.classList.remove('active');
+    spotlight.classList.add('hidden');
+    card.style.display='none';
+    localStorage.setItem('pathway-tour-done','1');
+  }
+
+  nextBtn.onclick=()=>{ if(step>=STEPS.length-1){endTour();return;} step++; renderStep(); };
+  prevBtn.onclick=()=>{ if(step>0){step--;renderStep();} };
+  skipBtn.onclick=endTour;
+  document.addEventListener('keydown',e=>{
+    if(!overlay.classList.contains('active')) return;
+    if(e.key==='Escape') endTour();
+    if(e.key==='ArrowRight'&&step<STEPS.length-1){step++;renderStep();}
+    if(e.key==='ArrowLeft'&&step>0){step--;renderStep();}
+  });
+
+  // "? Tour" button in header
+  const helpBtn=document.createElement('button');
+  helpBtn.id='tour-help-btn';
+  helpBtn.textContent='? Tour';
+  helpBtn.onclick=startTour;
+  document.querySelector('header .spacer').insertAdjacentElement('afterend',helpBtn);
+
+  // Auto-start for first-time visitors
+  if(!localStorage.getItem('pathway-tour-done')) startTour();
+})();
+</script>
 
 </body></html>
