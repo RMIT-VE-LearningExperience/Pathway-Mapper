@@ -8,6 +8,7 @@ const JSON_HEADERS = {
 
 const MAX_VIEW_BYTES = 900000;
 const MAX_GENERATE_TEXT_BYTES = 120000;
+const DEFAULT_COL_COLOR = "#d6d8dc";
 const EDITORS = new Set(["ci-compact", "ci-full", "ft"]);
 const PALETTE = [
   "#3f9c54",
@@ -357,7 +358,8 @@ function buildMapFromVal(result, cols, editor) {
     id: Number(c.id) || i + 1,
     label: cleanName(c.label || `Level ${i + 1}`),
     x: Number(c.x) || 20 + i * 230,
-    w: Number(c.w) || 210
+    w: Number(c.w) || 210,
+    color: cleanColor(c.color) || DEFAULT_COL_COLOR
   }));
   const colorByDiscipline = new Map();
   const idByToken = new Map();
@@ -427,18 +429,18 @@ function defaultCols(editor) {
   const w = 230;
   if (editor === "ft") {
     return [
-      { id: 4, label: "AQF Level 4", x: 20, w },
-      { id: 5, label: "AQF Level 5", x: 270, w },
-      { id: 6, label: "AQF Level 6", x: 520, w },
-      { id: 7, label: "AQF Level 7", x: 770, w }
+      { id: 4, label: "AQF Level 4", x: 20, w, color: DEFAULT_COL_COLOR },
+      { id: 5, label: "AQF Level 5", x: 270, w, color: DEFAULT_COL_COLOR },
+      { id: 6, label: "AQF Level 6", x: 520, w, color: DEFAULT_COL_COLOR },
+      { id: 7, label: "AQF Level 7", x: 770, w, color: DEFAULT_COL_COLOR }
     ];
   }
   return [
-    { id: 3, label: "AQF Level 3", x: 20, w },
-    { id: 4, label: "AQF Level 4", x: 270, w },
-    { id: 5, label: "AQF Level 5", x: 520, w },
-    { id: 6, label: "AQF Level 6", x: 770, w },
-    { id: 7, label: "AQF Level 7", x: 1020, w }
+    { id: 3, label: "AQF Level 3", x: 20, w, color: DEFAULT_COL_COLOR },
+    { id: 4, label: "AQF Level 4", x: 270, w, color: DEFAULT_COL_COLOR },
+    { id: 5, label: "AQF Level 5", x: 520, w, color: DEFAULT_COL_COLOR },
+    { id: 6, label: "AQF Level 6", x: 770, w, color: DEFAULT_COL_COLOR },
+    { id: 7, label: "AQF Level 7", x: 1020, w, color: DEFAULT_COL_COLOR }
   ];
 }
 

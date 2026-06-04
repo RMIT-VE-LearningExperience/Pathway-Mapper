@@ -12,7 +12,7 @@
 <style>
   :root{
     --bg:#f4f6f9; --panel:#ffffff; --ink:#1d2530; --muted:#6b7785;
-    --line:#dfe5ec; --accent:#d4543a; --col:#e9eef4;
+    --line:#dfe5ec; --accent:#d4543a; --col:#d6d8dc;
     --shadow:0 1px 3px rgba(20,30,45,.08),0 6px 18px rgba(20,30,45,.06);
   }
   *{box-sizing:border-box}
@@ -307,7 +307,7 @@ const host=document.getElementById('host');
 
 // ---- AQF columns ----
 const COL_WIDTH=230;
-const DEFAULT_COL_COLOR='#e9eef4';
+const DEFAULT_COL_COLOR='#d6d8dc';
 const COLS=[
   {id:4,label:"AQF Level 4",x:20,w:COL_WIDTH,color:DEFAULT_COL_COLOR},
   {id:5,label:"AQF Level 5",x:270,w:COL_WIDTH,color:DEFAULT_COL_COLOR},
@@ -754,7 +754,8 @@ async function createNewMap(){
   const title=prompt('Map title:','Future Technologies — New Pathway Map');
   if(title===null)return;
   const name=title.trim()||'Future Technologies — New Pathway Map';
-  const blankData={cols:cloneState(COLS),styles:cloneState(STYLES),nodes:[],edges:[],lineRouting:'straight'};
+  const blankCols=COLS.map(c=>({...cloneState(c),color:DEFAULT_COL_COLOR}));
+  const blankData={cols:blankCols,styles:cloneState(STYLES),nodes:[],edges:[],lineRouting:'straight'};
   const body={editor:EDITOR_ID,name,title:name,badge:(document.querySelector('header .badge')?.textContent||'').trim(),data:blankData};
   const res=await fetch(`${VIEW_API}/views`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
   const saved=await res.json();
