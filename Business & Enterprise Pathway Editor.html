@@ -32,8 +32,11 @@
   button.tool.loading{position:relative;color:transparent;pointer-events:none}
   button.tool.loading::after{content:"";position:absolute;inset:0;margin:auto;width:14px;height:14px;border:2px solid #dfe5ec;border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
-  button.ai-tool{width:36px;height:36px;padding:5px;border-radius:8px;display:flex;align-items:center;justify-content:center}
-  button.ai-tool img{width:24px;height:24px;display:block}
+  @keyframes aiRing{to{transform:rotate(360deg)}}
+  button.ai-tool{width:36px;height:36px;padding:5px;border-radius:8px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;isolation:isolate;border-color:transparent}
+  button.ai-tool::before{content:"";position:absolute;inset:-2px;background:conic-gradient(from 0deg,transparent 0 62%,#d4543a 72%,#f4b23e 82%,transparent 94%);animation:aiRing 2.2s linear infinite;z-index:0}
+  button.ai-tool::after{content:"";position:absolute;inset:2px;border-radius:6px;background:#fff;z-index:1}
+  button.ai-tool img{width:24px;height:24px;display:block;position:relative;z-index:2}
   /* ---- layout ---- */
   .wrap{display:flex;height:calc(100vh - 53px)}
   .side{width:280px;background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:16px;flex-shrink:0}
