@@ -1568,11 +1568,11 @@ refreshMapSwitcherViews().catch(()=>{});
 
 <!-- ===== ONBOARDING TOUR ===== -->
 <style>
-#tour-overlay{position:fixed;inset:0;z-index:9000;pointer-events:none}
-#tour-overlay.active{pointer-events:all}
+#tour-overlay{position:fixed;inset:0;z-index:9000;pointer-events:none;background:rgba(15,25,40,.6);opacity:0;transition:opacity .2s}
+#tour-overlay.active{pointer-events:all;opacity:1}
 #tour-spotlight{
   position:fixed;border-radius:10px;pointer-events:none;z-index:9001;
-  box-shadow:0 0 0 5px rgba(255,255,255,.85),0 0 0 9999px rgba(15,25,40,.6);
+  box-shadow:0 0 0 5px rgba(255,255,255,.85);
   transition:top .32s ease,left .32s ease,width .32s ease,height .32s ease,opacity .2s;
 }
 #tour-spotlight.hidden{opacity:0;pointer-events:none;box-shadow:none}
