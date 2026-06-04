@@ -978,6 +978,10 @@ async function saveCloudView(){
   const saved=await res.json();
   if(!res.ok)throw new Error(saved.error||'Save failed');
   localStorage.setItem(`pathway-view-token:${saved.id}`,saved.editToken);
+  const url=new URL(window.location.href);
+  url.searchParams.set('view',saved.id);
+  url.searchParams.set('v',Date.now());
+  history.replaceState(null,'',url);
   await refreshMapSwitcherViews();
   alert(`Saved "${saved.name}".\nView ID: ${saved.id}`);
   document.getElementById('mapSw').classList.add('open');
