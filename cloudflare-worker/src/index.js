@@ -9,7 +9,14 @@ const JSON_HEADERS = {
 const MAX_VIEW_BYTES = 900000;
 const MAX_GENERATE_TEXT_BYTES = 120000;
 const DEFAULT_COL_COLOR = "#d6d8dc";
-const EDITORS = new Set(["ci-compact", "ci-full", "ft"]);
+const EDITORS = new Set([
+  "ci-compact",
+  "ci-full",
+  "ft",
+  "business-enterprise",
+  "built-environment-sustainability",
+  "social-care-health"
+]);
 const PALETTE = [
   "#3f9c54",
   "#4aa1a6",
