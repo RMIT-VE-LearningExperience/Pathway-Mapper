@@ -123,7 +123,6 @@ async function updateView(request, env, id) {
 async function deleteView(request, env, id) {
   const existing = await env.PATHWAY_VIEWS.get(viewKey(id), "json");
   if (!existing) return json({ error: "View not found" }, 404);
-  requireEditToken(request, existing);
 
   await env.PATHWAY_VIEWS.delete(viewKey(id));
   await env.PATHWAY_VIEWS.delete(metaKey(existing.editor, id));

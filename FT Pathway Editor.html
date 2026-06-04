@@ -1026,9 +1026,9 @@ async function loadLatestCloudView(){
 }
 async function deleteCloudView(id,name){
   const token=localStorage.getItem(`pathway-view-token:${id}`);
-  if(!token){alert('This browser can only delete views it saved.');return;}
   if(!confirm(`Delete "${name}"?`))return;
-  const res=await fetch(`${VIEW_API}/views/${encodeURIComponent(id)}`,{method:'DELETE',headers:{'x-edit-token':token}});
+  const headers=token?{'x-edit-token':token}:{};
+  const res=await fetch(`${VIEW_API}/views/${encodeURIComponent(id)}`,{method:'DELETE',headers});
   const result=await res.json();
   if(!res.ok)throw new Error(result.error||'Could not delete view');
   localStorage.removeItem(`pathway-view-token:${id}`);
