@@ -50,7 +50,7 @@
   .node{position:absolute;width:190px;min-height:40px;border-radius:6px;padding:6px 8px;color:#fff;
     box-shadow:var(--shadow);cursor:grab;font-size:10.5px;line-height:1.25;user-select:none;border:2px solid transparent}
   .node .title{font-weight:700;display:block}
-  .node .code{font-size:9px;opacity:.85;font-weight:600;display:block;margin-top:2px;letter-spacing:.3px}
+  .node .code{font-size:9px;opacity:.85;font-weight:600;display:block;margin-bottom:2px;letter-spacing:.3px}
   .node.sel{border-color:#111;box-shadow:0 0 0 3px rgba(0,0,0,.15),var(--shadow)}
   .node.link-src{border-color:#111;box-shadow:0 0 0 3px var(--accent)}
   .node .port{position:absolute;width:11px;height:11px;border-radius:50%;background:#fff;border:2px solid #111;
@@ -458,7 +458,7 @@ function renderNodes(){
     el.className='node'; el.dataset.id=n.id;
     el.style.left=n.x+'px'; el.style.top=n.y+'px';
     el.style.background=n.color; el.style.width=(n.w||184)+'px';
-    el.innerHTML=`<span class="title">${esc(n.title)}</span>${n.code?`<span class="code">${esc(n.code)}</span>`:''}
+    el.innerHTML=`${n.code?`<span class="code">${esc(n.code)}</span>`:''}<span class="title">${esc(n.title)}</span>
       <span class="port l"></span><span class="port r"></span>`;
     if(selNodes.has(n.id)) el.classList.add('sel');
     if(linkFrom===n.id) el.classList.add('link-src');
@@ -631,14 +631,14 @@ function inspect(){
   if(selNode){
     const n=nodes.find(x=>x.id===selNode);
     box.innerHTML=`
-      <label class="fld">Title</label><textarea id="f-title">${esc(n.title)}</textarea>
       <label class="fld">Code</label><input type="text" id="f-code" value="${esc(n.code||'')}">
+      <label class="fld">Title</label><textarea id="f-title">${esc(n.title)}</textarea>
       <label class="fld">AQF Level</label>
       <select id="f-col">${COLS.map(c=>`<option value="${c.id}" ${c.id===n.col?'selected':''}>${c.label}</option>`).join('')}</select>
       <label class="fld">Colour</label>
       <div class="swatch-row">${PALETTE.map(c=>`<div class="sw ${c===n.color?'on':''}" data-c="${c}" style="background:${c}"></div>`).join('')}</div>`;
-    document.getElementById('f-title').oninput=e=>{pushHistory();n.title=e.target.value;renderNodes();renderEdges();};
     document.getElementById('f-code').oninput=e=>{pushHistory();n.code=e.target.value;renderNodes();renderEdges();};
+    document.getElementById('f-title').oninput=e=>{pushHistory();n.title=e.target.value;renderNodes();renderEdges();};
     document.getElementById('f-col').onchange=e=>{pushHistory();n.col=+e.target.value;n.x=COLS.find(c=>c.id===n.col).x+15;renderNodes();renderEdges();};
     box.querySelectorAll('.sw').forEach(s=>s.onclick=()=>{pushHistory();n.color=s.dataset.c;renderNodes();renderEdges();inspect();});
   }else if(selEdge){
@@ -1135,7 +1135,7 @@ function exportHTML(){
   COLS.forEach(c=>{cols+=`<div style="position:absolute;left:${c.x}px;top:0;width:${c.w}px;height:100%;background:${columnColor(c)};opacity:.5;border-radius:10px"></div>
     <div style="position:absolute;left:${c.x}px;top:14px;width:${c.w}px;text-align:center;font-weight:700;color:#3a4654;font:13px Segoe UI,sans-serif">${c.label}</div>`;});
   nodes.forEach(n=>{nodeHtml+=`<div style="position:absolute;left:${n.x}px;top:${n.y}px;width:${(n.w||184)}px;background:${n.color};color:#fff;border-radius:8px;padding:9px 11px;font:11.5px Segoe UI,sans-serif;line-height:1.3;box-shadow:0 4px 10px rgba(0,0,0,.12)">
-    <b>${esc(n.title)}</b>${n.code?`<br><span style="font-size:9.5px;opacity:.85">${esc(n.code)}</span>`:''}</div>`;});
+    ${n.code?`<span style="font-size:9.5px;opacity:.85;font-weight:600">${esc(n.code)}</span><br>`:''}<b>${esc(n.title)}</b></div>`;});
   let legend=Object.values(STYLES).map(v=>{const dash=v.dash==='none'?'':`stroke-dasharray="${v.dash}"`;
     return `<div style="display:flex;align-items:center;gap:8px;margin:6px 0;font:12px Segoe UI,sans-serif"><svg width="44" height="12"><line x1="0" y1="6" x2="44" y2="6" stroke="#333" stroke-width="${v.w}" stroke-linecap="${v.cap}" ${dash}/></svg><span>${v.label}</span></div>`;}).join('');
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Creative Industries Pathways</title></head>
@@ -1230,15 +1230,17 @@ function buildMapCanvas(){
     const nx=ox+n.x, ny=oy+n.y;
     ctx.fillStyle=n.color; roundRect(ctx,nx,ny,w,h,6); ctx.fill();
     ctx.fillStyle='#fff';
-    ctx.font='bold 10.5px "Segoe UI",Helvetica,Arial,sans-serif';
-    const lines=wrapText(ctx,n.title,w-14);
-    lines.forEach((ln,i)=>ctx.fillText(ln,nx+7,ny+13+i*12));
+    let textY=ny+13;
     if(n.code){
       ctx.font='600 9px "Segoe UI",Helvetica,Arial,sans-serif';
       ctx.globalAlpha=0.85;
-      ctx.fillText(n.code,nx+7,ny+13+lines.length*12+3);
+      ctx.fillText(n.code,nx+7,textY);
       ctx.globalAlpha=1;
+      textY+=12;
     }
+    ctx.font='bold 10.5px "Segoe UI",Helvetica,Arial,sans-serif';
+    const lines=wrapText(ctx,n.title,w-14);
+    lines.forEach((ln,i)=>ctx.fillText(ln,nx+7,textY+i*12));
   });
   let legY2=oy+maxY+PAD+10;
   let legX2=PAD;
@@ -1375,15 +1377,17 @@ function buildSlideCanvas(){
     const h=el?el.offsetHeight:40,w=n.w||184;
     ctx.fillStyle=n.color;roundRect(ctx,n.x,n.y,w,h,6);ctx.fill();
     ctx.fillStyle='#fff';
-    ctx.font='bold 10.5px "Segoe UI",Helvetica,Arial,sans-serif';
-    const lines=wrapText(ctx,n.title,w-14);
-    lines.forEach((ln,i)=>ctx.fillText(ln,n.x+7,n.y+13+i*12));
+    let textY=n.y+13;
     if(n.code){
       ctx.font='600 9px "Segoe UI",Helvetica,Arial,sans-serif';
       ctx.globalAlpha=0.85;
-      ctx.fillText(n.code,n.x+7,n.y+13+lines.length*12+3);
+      ctx.fillText(n.code,n.x+7,textY);
       ctx.globalAlpha=1;
+      textY+=12;
     }
+    ctx.font='bold 10.5px "Segoe UI",Helvetica,Arial,sans-serif';
+    const lines=wrapText(ctx,n.title,w-14);
+    lines.forEach((ln,i)=>ctx.fillText(ln,n.x+7,textY+i*12));
   });
 
   ctx.restore();
