@@ -1550,18 +1550,18 @@ refreshMapSwitcherViews().catch(()=>{});
 #tour-spotlight.hidden{opacity:0;pointer-events:none;box-shadow:none}
 #tour-card{
   position:fixed;z-index:9002;background:#fff;border-radius:14px;
-  padding:22px 24px 18px;width:300px;
+  padding:22px 24px 18px;width:min(300px,calc(100vw - 32px));box-sizing:border-box;
   box-shadow:0 16px 48px rgba(0,0,0,.2),0 2px 8px rgba(0,0,0,.08);
   transition:top .32s ease,left .32s ease;
 }
 #tour-card h3{margin:0 0 8px;font-size:15px;font-weight:700;color:#1d2530}
 #tour-card p{margin:0 0 18px;font-size:13px;color:#4a5568;line-height:1.6}
 #tour-step-lbl{font-size:10px;color:#aab4c2;font-weight:700;letter-spacing:.6px;text-transform:uppercase;margin-bottom:6px}
-.t-footer{display:flex;align-items:center;gap:6px}
+.t-footer{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .t-dots{flex:1;display:flex;gap:5px;align-items:center}
 .t-dot{width:7px;height:7px;border-radius:50%;background:#dfe5ec;transition:background .2s,transform .2s;flex-shrink:0}
 .t-dot.on{background:#d4543a;transform:scale(1.25)}
-.t-btn{font:inherit;font-size:12.5px;font-weight:600;border-radius:8px;cursor:pointer;padding:7px 14px;transition:.15s;white-space:nowrap}
+.t-btn{font:inherit;font-size:12.5px;font-weight:600;border-radius:8px;cursor:pointer;padding:7px 12px;transition:.15s;white-space:nowrap;min-width:0}
 .t-btn.tnext{background:#d4543a;color:#fff;border:none}
 .t-btn.tnext:hover{background:#b8432c}
 .t-btn.tprev{background:none;border:1px solid #dfe5ec;color:#6b7785;font-size:12px}
