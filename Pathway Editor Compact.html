@@ -202,7 +202,7 @@
       <button id="impBtn">⤒ Import JSON</button>
     </div>
   </div>
-  <button class="tool ai-tool" id="aiTopBtn" title="AI Assist" aria-label="AI Assist"><img src="val.png" alt=""></button>
+  <button class="tool ai-tool" id="aiTopBtn" title="VAL AI Assist" aria-label="VAL AI Assist"><img src="val.png" alt=""></button>
   <button class="tool" id="expHtml" style="display:none">⤓ HTML</button>
   <input type="file" id="fileIn" accept=".json" hidden="">
 </header>
@@ -836,7 +836,7 @@ document.getElementById('fileIn').onchange=e=>{
 // ===== cloud saved views =====
 const VIEW_API='https://pathway-editor-views.lawrence-makoona.workers.dev';
 const EDITOR_ID='ci-compact';
-const AI_CONTACT_MESSAGE='AI Assist is currently unavailable. Please contact dmd.cove@rmit.edu.au to reactivate the API capabilities.';
+const AI_CONTACT_MESSAGE='VAL AI Assist is currently unavailable. Please contact dmd.cove@rmit.edu.au to reactivate the API capabilities.';
 let undoStack=[], redoStack=[], restoringHistory=false;
 function currentViewData(){return{cols:COLS,styles:STYLES,nodes,edges,lineRouting};}
 function cloneState(value){return JSON.parse(JSON.stringify(value));}
@@ -1097,7 +1097,7 @@ function ensureAiModal(){
   if(document.getElementById('aiModal'))return;
   document.body.insertAdjacentHTML('beforeend',`<div class="view-modal" id="aiModal" role="dialog" aria-modal="true" aria-labelledby="aiModalTitle">
     <div class="view-panel">
-      <div class="view-head"><h3 id="aiModalTitle">AI Assist</h3><button class="view-close" id="aiClose">Close</button></div>
+      <div class="view-head"><h3 id="aiModalTitle">VAL AI Assist</h3><button class="view-close" id="aiClose">Close</button></div>
       <div class="ai-panel" id="aiPanel">
         <textarea id="aiPrompt" placeholder="Paste pathway notes or describe the map to generate."></textarea>
         <input type="file" id="aiFileIn" accept=".txt,.md,.csv,.json,.pdf,.png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp,application/pdf">
@@ -1632,8 +1632,8 @@ refreshMapSwitcherViews().catch(()=>{});
     },
     {
       sel:'#aiTopBtn',placement:'bottom',
-      title:'AI Assist',
-      text:'Click the VAL icon to open AI Assist. Paste pathway notes or upload text, PDF, or image files, then generate a draft map.'
+      title:'VAL AI Assist',
+      text:'Click the VAL icon to open VAL AI Assist. Paste pathway notes or upload text, PDF, or image files, then generate a draft map.'
     },
     {
       sel:'#viewsGroup',placement:'bottom',
