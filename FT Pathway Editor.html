@@ -715,7 +715,7 @@ document.getElementById('mapSwBtn').onclick=e=>{
   sw.classList.toggle('open');
   if(sw.classList.contains('open'))refreshMapSwitcherViews().catch(()=>{});
 };
-document.getElementById('createNewMapBtn').onclick=e=>{e.stopPropagation();createNewMap();document.getElementById('mapSw').classList.remove('open');};
+document.getElementById('createNewMapBtn').onclick=e=>{e.stopPropagation();createNewMap().catch(err=>alert(err.message));document.getElementById('mapSw').classList.remove('open');};
 document.getElementById('expBtn').onclick=e=>{e.stopPropagation();document.getElementById('expGroup').classList.toggle('open');};
 document.getElementById('viewsBtn').onclick=e=>{e.stopPropagation();document.getElementById('viewsGroup').classList.toggle('open');};
 document.addEventListener('click',()=>{
@@ -748,16 +748,21 @@ function deleteWithFeedback(){
     btn.disabled=false;
   },180);
 }
-function createNewMap(){
+async function createNewMap(){
   if(!confirm('Create a new blank map? Unsaved changes on this canvas will be cleared.'))return;
   const title=prompt('Map title:','Future Technologies — New Pathway Map');
   if(title===null)return;
-  pushHistory();
-  document.querySelector('header h1').textContent=title.trim()||'Future Technologies — New Pathway Map';
-  nodes=[];edges=[];nextN=1;nextE=1;selNode=null;selEdge=null;selNodes.clear();linkFrom=null;
-  lineRouting='straight';document.getElementById('lineRouting').value=lineRouting;
-  host.scrollTo({left:0,top:0});
-  renderNodes();renderEdges();inspect();
+  const name=title.trim()||'Future Technologies — New Pathway Map';
+  const blankData={cols:cloneState(COLS),styles:cloneState(STYLES),nodes:[],edges:[],lineRouting:'straight'};
+  const body={editor:EDITOR_ID,name,title:name,badge:(document.querySelector('header .badge')?.textContent||'').trim(),data:blankData};
+  const res=await fetch(`${VIEW_API}/views`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+  const saved=await res.json();
+  if(!res.ok)throw new Error(saved.error||'Could not create new view');
+  localStorage.setItem(`pathway-view-token:${saved.id}`,saved.editToken);
+  const url=new URL(window.location.href);
+  url.searchParams.set('view',saved.id);
+  url.searchParams.set('v',Date.now());
+  window.location.href=url.href;
 }
 document.addEventListener('keydown',e=>{if((e.key==='Delete'||e.key==='Backspace')&&(selNode||selEdge||selNodes.size)){
   if(isEditingText())return;deleteWithFeedback();}
@@ -984,16 +989,26 @@ async function loadCloudView(){
   renderViewList(list.views);
   document.getElementById('viewModal').classList.add('open');
 }
-async function loadCloudViewById(id){
+async function loadCloudViewById(id,{setUrl=true,addHistory=true}={}){
   const viewRes=await fetch(`${VIEW_API}/views/${encodeURIComponent(id)}`);
   const view=await viewRes.json();
   if(!viewRes.ok)throw new Error(view.error||'Could not load view');
-  pushHistory();
+  if(addHistory)pushHistory();
   if(view.title)document.querySelector('header h1').textContent=view.title;
   if(view.badge)document.querySelector('header .badge').textContent=view.badge;
   applyViewData(view.data);
+  if(setUrl){
+    const url=new URL(window.location.href);
+    url.searchParams.set('view',id);
+    history.replaceState(null,'',url);
+  }
   document.getElementById('mapSw').classList.remove('open');
   closeViewList();
+}
+async function loadInitialCloudView(){
+  const id=new URLSearchParams(window.location.search).get('view');
+  if(id){await loadCloudViewById(id,{setUrl:false,addHistory:false});return;}
+  await loadLatestCloudView();
 }
 async function loadLatestCloudView(){
   const res=await fetch(`${VIEW_API}/views?editor=${encodeURIComponent(EDITOR_ID)}&t=${Date.now()}`,{cache:'no-store'});
@@ -1534,7 +1549,7 @@ function rebuildCols(){
 
 // ===== boot =====
 seed();rebuildCols();renderNodes();renderEdges();renderLegend();inspect();renderColEditor();updateHistoryButtons();
-loadLatestCloudView().catch(err=>setAiStatus(`Could not load latest saved view: ${err.message}`,true));
+loadInitialCloudView().catch(err=>setAiStatus(`Could not load saved view: ${err.message}`,true));
 refreshMapSwitcherViews().catch(()=>{});
 </script>
 
