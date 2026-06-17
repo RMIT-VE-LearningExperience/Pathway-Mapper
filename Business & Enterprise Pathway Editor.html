@@ -64,6 +64,7 @@
   svg#edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}
   .node{z-index:2}
   path.edge{fill:none;stroke-width:2.4;cursor:pointer;pointer-events:stroke}
+  path.edge-hit{fill:none;stroke:transparent;stroke-width:18;stroke-linecap:round;stroke-linejoin:round;cursor:pointer;pointer-events:stroke}
   path.edge.sel{stroke-width:4}
   path.ghost{fill:none;stroke:#888;stroke-width:2;stroke-dasharray:6 4;opacity:.5;pointer-events:none}
   .edge-handle{fill:#fff;stroke:#2c7fbf;stroke-width:2;cursor:move;pointer-events:all}
@@ -592,6 +593,10 @@ function renderEdges(){
     const d=lineRouting==='straight'
       ?straightPath(x1,y1,x2,y2,e)
       :`M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
+    const hit=document.createElementNS(SVGNS,'path');
+    hit.setAttribute('d',d);hit.setAttribute('class','edge-hit');
+    hit.addEventListener('click',ev=>{ev.stopPropagation();selectEdge(e.id);});
+    svg.appendChild(hit);
     const p=document.createElementNS(SVGNS,'path');
     const st=STYLES[e.style]||STYLES.guar;
     p.setAttribute('d',d); p.setAttribute('class','edge');
