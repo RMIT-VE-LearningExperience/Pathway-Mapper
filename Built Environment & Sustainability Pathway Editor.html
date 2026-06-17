@@ -68,7 +68,7 @@
   path.edge.sel{stroke-width:4}
   path.ghost{fill:none;stroke:#888;stroke-width:2;stroke-dasharray:6 4;opacity:.5;pointer-events:none}
   .edge-handle{fill:#fff;stroke:#2c7fbf;stroke-width:2;cursor:move;pointer-events:all}
-  .edge-handle:hover{fill:#e8f0fe}
+  .edge-handle:hover,.edge-handle.sel{fill:#e8f0fe;stroke:#111}
   .edge-add-handle{fill:#315dff;stroke:#fff;stroke-width:1.5;cursor:copy;pointer-events:all}
   .edge-add-handle:hover{r:5}
   /* line styles */
@@ -582,6 +582,20 @@ function insertEdgePoint(e,x,y,index){
   pts.splice(Math.max(0,Math.min(index,pts.length)),0,{x:Math.round(x/7)*7,y:Math.round(y/7)*7});
 }
 function resetEdgePoints(e){delete e.points;delete e.bendX;delete e.bendY;}
+function clearSelectedEdgePoint(){selEdgePoint=null;}
+function removeSelectedEdgePoint(){
+  if(!selEdgePoint)return false;
+  const edge=edges.find(e=>e.id===selEdgePoint.edgeId);
+  if(!edge)return false;
+  const ep=edgeEndpoints(edge);if(!ep)return false;
+  const pts=ensureEdgePoints(edge,ep.x1,ep.y1,ep.x2,ep.y2);
+  if(selEdgePoint.index<0||selEdgePoint.index>=pts.length)return false;
+  pts.splice(selEdgePoint.index,1);
+  if(!pts.length)resetEdgePoints(edge);
+  clearSelectedEdgePoint();
+  renderEdges();inspect();
+  return true;
+}
 function renderEdges(){
   svg.innerHTML='';
   edges.forEach(e=>{
@@ -614,8 +628,10 @@ function renderEdges(){
         h.setAttribute('class','edge-handle');h.setAttribute('cx',pt.x);h.setAttribute('cy',pt.y);h.setAttribute('r',i===0||i===vertices.length-1?6:5);
         if(i>0&&i<vertices.length-1){
           const pointIndex=Math.max(0,Math.min(edgeWaypoints(x1,y1,x2,y2,e).length-1,Math.floor((i-1)/2)));
-          h.addEventListener('mousedown',ev=>{ev.stopPropagation();pushHistory();ensureEdgePoints(e,x1,y1,x2,y2);edgePointDrag={edge:e,index:pointIndex};});
-          h.addEventListener('dblclick',ev=>{ev.stopPropagation();pushHistory();ensureEdgePoints(e,x1,y1,x2,y2).splice(pointIndex,1);if(!e.points.length)resetEdgePoints(e);renderEdges();inspect();});
+          if(selEdgePoint?.edgeId===e.id&&selEdgePoint.index===pointIndex)h.classList.add('sel');
+          h.addEventListener('click',ev=>{ev.stopPropagation();selEdgePoint={edgeId:e.id,index:pointIndex};renderEdges();inspect();});
+          h.addEventListener('mousedown',ev=>{ev.stopPropagation();pushHistory();ensureEdgePoints(e,x1,y1,x2,y2);selEdgePoint={edgeId:e.id,index:pointIndex};edgePointDrag={edge:e,index:pointIndex};renderEdges();});
+          h.addEventListener('dblclick',ev=>{ev.stopPropagation();pushHistory();selEdgePoint={edgeId:e.id,index:pointIndex};removeSelectedEdgePoint();});
         }
         svg.appendChild(h);
       });
@@ -632,7 +648,7 @@ function renderEdges(){
 }
 
 // ===== drag / link state (single global handler, not per-render) =====
-let drag=null, dragNode=null, dragEl=null, edgePointDrag=null;
+let drag=null, dragNode=null, dragEl=null, edgePointDrag=null, selEdgePoint=null;
 let multiDragOffsets=[];
 
 function boardXY(ev){
@@ -753,8 +769,8 @@ function selectNode(id,additive=false){
   }
   renderNodes();renderEdges();inspect();
 }
-function selectEdge(id){selEdge=id;selNode=null;selNodes.clear();renderNodes();renderEdges();inspect();}
-function clearSel(){selNode=null;selEdge=null;selNodes.clear();linkFrom=null;renderNodes();renderEdges();inspect();}
+function selectEdge(id){selEdge=id;selNode=null;selNodes.clear();clearSelectedEdgePoint();renderNodes();renderEdges();inspect();}
+function clearSel(){selNode=null;selEdge=null;selNodes.clear();clearSelectedEdgePoint();linkFrom=null;renderNodes();renderEdges();inspect();}
 
 function inspect(){
   const box=document.getElementById('inspector');
@@ -902,7 +918,11 @@ async function createNewMap(){
   url.searchParams.set('v',Date.now());
   window.location.href=url.href;
 }
-document.addEventListener('keydown',e=>{if((e.key==='Delete'||e.key==='Backspace')&&(selNode||selEdge||selNodes.size)){
+document.addEventListener('keydown',e=>{if((e.key==='Delete'||e.key==='Backspace')&&selEdgePoint){
+  if(isEditingText())return;
+  e.preventDefault();pushHistory();removeSelectedEdgePoint();return;
+}
+if((e.key==='Delete'||e.key==='Backspace')&&(selNode||selEdge||selNodes.size)){
   if(isEditingText())return;deleteWithFeedback();}
   if((e.metaKey||e.ctrlKey)&&!isEditingText()){
     const key=e.key.toLowerCase();
