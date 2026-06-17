@@ -66,6 +66,10 @@
   path.edge{fill:none;stroke-width:2.4;cursor:pointer;pointer-events:stroke}
   path.edge.sel{stroke-width:4}
   path.ghost{fill:none;stroke:#888;stroke-width:2;stroke-dasharray:6 4;opacity:.5;pointer-events:none}
+  .edge-handle{fill:#fff;stroke:#2c7fbf;stroke-width:2;cursor:move;pointer-events:all}
+  .edge-handle:hover{fill:#e8f0fe}
+  .edge-add-handle{fill:#315dff;stroke:#fff;stroke-width:1.5;cursor:copy;pointer-events:all}
+  .edge-add-handle:hover{r:5}
   /* line styles */
   .style-await{stroke-dasharray:none}              /* solid thin handled by width legend */
   .style-guar{stroke-dasharray:none}
@@ -77,8 +81,15 @@
     border-radius:7px;background:#fff;color:var(--ink)}
   textarea{resize:vertical;min-height:46px}
   .swatch-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
-  .sw{width:26px;height:26px;border-radius:6px;cursor:pointer;border:2px solid transparent}
+  .sw{width:26px;height:26px;border-radius:6px;cursor:pointer;border:2px solid transparent;background:transparent;padding:0;flex-shrink:0}
   .sw.on{border-color:#111}
+  .swatch-tools{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:7px}
+  .color-picker-label,.swatch-save,.swatch-remove{font:inherit;font-size:11.5px;font-weight:600;border:1px solid var(--line);background:#fff;
+    color:var(--ink);height:32px;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+  .color-picker-label:hover,.swatch-save:hover{border-color:var(--accent);color:var(--accent)}
+  .swatch-remove{color:#c0392b}
+  .swatch-remove:hover{border-color:#c0392b;background:#fff5f3}
+  .swatch-picker{width:22px;height:22px;padding:0;border:0;background:transparent;cursor:pointer}
   .hint{font-size:11px;color:var(--muted);line-height:1.5;background:#f7f9fb;border:1px solid var(--line);
     border-radius:8px;padding:9px 11px}
   .legend-item{display:flex;align-items:center;gap:8px;font-size:11.5px;margin:7px 0;color:var(--ink)}
@@ -334,6 +345,54 @@ const STYLES={
 const PALETTE=["#3f9c54","#4aa1a6","#e07a52","#d4543a","#3aa0d6","#2c7fbf",
   "#f06ba8","#d6202a","#3f9c54","#2e3b8c","#7d3fa0","#c0392b","#1b2a4a","#8a8f3a"];
 
+const CUSTOM_PALETTE_KEY='pathway-custom-swatch-library';
+let customPalette=loadCustomPalette();
+function loadCustomPalette(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(CUSTOM_PALETTE_KEY)||'[]');
+    return Array.isArray(saved)?saved.map(c=>normaliseHexColor(c,'')).filter(Boolean):[];
+  }catch(err){return [];}
+}
+function saveCustomPalette(){localStorage.setItem(CUSTOM_PALETTE_KEY,JSON.stringify(customPalette));}
+function paletteColors(){return [...new Set([...PALETTE,...customPalette])];}
+function isCustomSwatch(color){return customPalette.some(c=>c.toLowerCase()===String(color||'').toLowerCase());}
+function addCustomSwatch(color){
+  const clean=normaliseHexColor(color,'');
+  if(!clean||isCustomSwatch(clean))return false;
+  customPalette.push(clean);saveCustomPalette();return true;
+}
+function removeCustomSwatch(color){
+  const clean=normaliseHexColor(color,'');
+  if(!clean)return false;
+  const before=customPalette.length;
+  customPalette=customPalette.filter(c=>c.toLowerCase()!==clean.toLowerCase());
+  if(customPalette.length!==before){saveCustomPalette();return true;}
+  return false;
+}
+function renderSwatchControls(currentColor,kind){
+  const clean=normaliseHexColor(currentColor,PALETTE[0]);
+  const swatches=paletteColors().map(c=>`<button type="button" class="sw ${c.toLowerCase()===clean.toLowerCase()?'on':''}" data-c="${c}" style="background:${c}" title="${c}" aria-label="Use ${c}"></button>`).join('');
+  const removeBtn=isCustomSwatch(clean)?`<button type="button" class="swatch-remove" data-remove-custom="${kind}">Remove</button>`:'';
+  return `<div class="swatch-row">${swatches}</div>
+      <div class="swatch-tools">
+        <label class="color-picker-label"><input class="swatch-picker" type="color" value="${clean}" aria-label="Pick custom colour"><span>Pick</span></label>
+        <button type="button" class="swatch-save" data-save-custom="${kind}">Add swatch</button>
+        ${removeBtn}
+      </div>`;
+}
+function bindSwatchControls(box,currentColor,applyColor){
+  const picker=box.querySelector('.swatch-picker');
+  box.querySelectorAll('.sw').forEach(s=>s.onclick=()=>applyColor(s.dataset.c,{refresh:true}));
+  if(picker){
+    picker.oninput=()=>applyColor(picker.value,{refresh:false});
+    picker.onchange=()=>applyColor(picker.value,{refresh:true});
+  }
+  const saveBtn=box.querySelector('.swatch-save');
+  if(saveBtn)saveBtn.onclick=()=>{if(addCustomSwatch(picker?.value||currentColor))inspect();};
+  const removeBtn=box.querySelector('.swatch-remove');
+  if(removeBtn)removeBtn.onclick=()=>{if(removeCustomSwatch(picker?.value||currentColor))inspect();};
+}
+
 let nodes=[], edges=[], nextN=1, nextE=1;
 function syncCounters(){
   nextN=nodes.reduce((m,n)=>Math.max(m,parseInt(n.id.replace(/\D/g,''))||0),0)+1;
@@ -473,18 +532,56 @@ function renderNodes(){
 
 // ===== edges =====
 function nodeRect(n){return{x:n.x,y:n.y,w:(n.w||184),h:document.querySelector(`.node[data-id="${n.id}"]`)?.offsetHeight||54};}
-function straightPath(x1,y1,x2,y2,e={}){
+function edgeWaypoints(x1,y1,x2,y2,e={}){
+  if(Array.isArray(e.points)&&e.points.length){
+    return e.points.map(p=>({x:Number(p.x)||0,y:Number(p.y)||0}));
+  }
   const bx=(x1+x2)/2+(e.bendX||0);
   const hasY=typeof e.bendY==='number'&&e.bendY!==0;
-  const by=hasY?(y1+y2)/2+e.bendY:y2;
-  return `M ${x1} ${y1} L ${bx} ${y1} L ${bx} ${by} L ${x2} ${by} L ${x2} ${y2}`;
+  return [{x:bx,y:hasY?(y1+y2)/2+e.bendY:y2}];
+}
+function straightVertices(x1,y1,x2,y2,e={}){
+  const pts=[{x:x1,y:y1}];
+  let cur={x:x1,y:y1};
+  edgeWaypoints(x1,y1,x2,y2,e).forEach(p=>{
+    if(cur.x!==p.x)pts.push({x:p.x,y:cur.y});
+    if(cur.y!==p.y)pts.push({x:p.x,y:p.y});
+    cur={x:p.x,y:p.y};
+  });
+  if(cur.x!==x2)pts.push({x:x2,y:cur.y});
+  if(cur.y!==y2)pts.push({x:x2,y:y2});
+  return pts;
+}
+function straightPath(x1,y1,x2,y2,e={}){
+  return straightVertices(x1,y1,x2,y2,e).map((p,i)=>`${i?'L':'M'} ${p.x} ${p.y}`).join(' ');
 }
 function drawStraightRoute(ctx,x1,y1,x2,y2,e={}){
-  const bx=(x1+x2)/2+(e.bendX||0);
-  const hasY=typeof e.bendY==='number'&&e.bendY!==0;
-  const by=hasY?(y1+y2)/2+e.bendY:y2;
-  ctx.lineTo(bx,y1);ctx.lineTo(bx,by);ctx.lineTo(x2,by);ctx.lineTo(x2,y2);
+  straightVertices(x1,y1,x2,y2,e).slice(1).forEach(p=>ctx.lineTo(p.x,p.y));
 }
+function ensureEdgePoints(e,x1,y1,x2,y2){
+  if(!Array.isArray(e.points)||!e.points.length){
+    e.points=edgeWaypoints(x1,y1,x2,y2,e);
+    delete e.bendX;delete e.bendY;
+  }
+  return e.points;
+}
+function edgeEndpoints(e){
+  const a=nodes.find(n=>n.id===e.from), b=nodes.find(n=>n.id===e.to);
+  if(!a||!b)return null;
+  const ra=nodeRect(a), rb=nodeRect(b);
+  return{x1:ra.x+ra.w,y1:ra.y+ra.h/2,x2:rb.x,y2:rb.y+rb.h/2};
+}
+function addEdgePoint(e){
+  const ep=edgeEndpoints(e);if(!ep)return;
+  const pts=ensureEdgePoints(e,ep.x1,ep.y1,ep.x2,ep.y2);
+  pts.push({x:Math.round(((ep.x1+ep.x2)/2)/7)*7,y:Math.round(((ep.y1+ep.y2)/2)/7)*7});
+}
+function insertEdgePoint(e,x,y,index){
+  const ep=edgeEndpoints(e);if(!ep)return;
+  const pts=ensureEdgePoints(e,ep.x1,ep.y1,ep.x2,ep.y2);
+  pts.splice(Math.max(0,Math.min(index,pts.length)),0,{x:Math.round(x/7)*7,y:Math.round(y/7)*7});
+}
+function resetEdgePoints(e){delete e.points;delete e.bendX;delete e.bendY;}
 function renderEdges(){
   svg.innerHTML='';
   edges.forEach(e=>{
@@ -506,11 +603,32 @@ function renderEdges(){
     if(selEdge===e.id) p.classList.add('sel');
     p.addEventListener('click',ev=>{ev.stopPropagation();selectEdge(e.id);});
     svg.appendChild(p);
+    if(selEdge===e.id&&lineRouting==='straight'){
+      const vertices=straightVertices(x1,y1,x2,y2,e);
+      vertices.forEach((pt,i)=>{
+        const h=document.createElementNS(SVGNS,'circle');
+        h.setAttribute('class','edge-handle');h.setAttribute('cx',pt.x);h.setAttribute('cy',pt.y);h.setAttribute('r',i===0||i===vertices.length-1?6:5);
+        if(i>0&&i<vertices.length-1){
+          const pointIndex=Math.max(0,Math.min(edgeWaypoints(x1,y1,x2,y2,e).length-1,Math.floor((i-1)/2)));
+          h.addEventListener('mousedown',ev=>{ev.stopPropagation();pushHistory();ensureEdgePoints(e,x1,y1,x2,y2);edgePointDrag={edge:e,index:pointIndex};});
+          h.addEventListener('dblclick',ev=>{ev.stopPropagation();pushHistory();ensureEdgePoints(e,x1,y1,x2,y2).splice(pointIndex,1);if(!e.points.length)resetEdgePoints(e);renderEdges();inspect();});
+        }
+        svg.appendChild(h);
+      });
+      vertices.slice(0,-1).forEach((a,i)=>{
+        const b=vertices[i+1];
+        if(Math.hypot(b.x-a.x,b.y-a.y)<28)return;
+        const h=document.createElementNS(SVGNS,'circle');
+        h.setAttribute('class','edge-add-handle');h.setAttribute('cx',(a.x+b.x)/2);h.setAttribute('cy',(a.y+b.y)/2);h.setAttribute('r',4);
+        h.addEventListener('click',ev=>{ev.stopPropagation();pushHistory();insertEdgePoint(e,(a.x+b.x)/2,(a.y+b.y)/2,Math.floor((i+1)/2));renderEdges();inspect();});
+        svg.appendChild(h);
+      });
+    }
   });
 }
 
 // ===== drag / link state (single global handler, not per-render) =====
-let drag=null, dragNode=null, dragEl=null;
+let drag=null, dragNode=null, dragEl=null, edgePointDrag=null;
 let multiDragOffsets=[];
 
 function boardXY(ev){
@@ -520,6 +638,13 @@ function boardXY(ev){
 }
 
 window.addEventListener('mousemove',ev=>{
+  if(edgePointDrag){
+    const p=boardXY(ev);
+    const pts=edgePointDrag.edge.points||[];
+    pts[edgePointDrag.index]={x:Math.round(p.x/7)*7,y:Math.round(p.y/7)*7};
+    renderEdges();
+    return;
+  }
   if(!drag) return;
   const p=boardXY(ev);
   if(multiDragOffsets.length>1){
@@ -537,6 +662,7 @@ window.addEventListener('mousemove',ev=>{
   renderEdges();
 });
 window.addEventListener('mouseup',()=>{
+  if(edgePointDrag){edgePointDrag=null;inspect();}
   if(drag){drag=null;multiDragOffsets=[];if(dragEl)dragEl.style.cursor='grab';dragEl=null;dragNode=null;}
 });
 
@@ -640,11 +766,11 @@ function inspect(){
       <label class="fld">AQF Level</label>
       <select id="f-col">${COLS.map(c=>`<option value="${c.id}" ${c.id===n.col?'selected':''}>${c.label}</option>`).join('')}</select>
       <label class="fld">Colour</label>
-      <div class="swatch-row">${PALETTE.map(c=>`<div class="sw ${c===n.color?'on':''}" data-c="${c}" style="background:${c}"></div>`).join('')}</div>`;
+      ${renderSwatchControls(n.color,'node')}`;
     document.getElementById('f-code').oninput=e=>{pushHistory();n.code=e.target.value;renderNodes();renderEdges();};
     document.getElementById('f-title').oninput=e=>{pushHistory();n.title=e.target.value;renderNodes();renderEdges();};
     document.getElementById('f-col').onchange=e=>{pushHistory();n.col=+e.target.value;n.x=COLS.find(c=>c.id===n.col).x+15;renderNodes();renderEdges();};
-    box.querySelectorAll('.sw').forEach(s=>s.onclick=()=>{pushHistory();n.color=s.dataset.c;renderNodes();renderEdges();inspect();});
+    bindSwatchControls(box,n.color,(color,{refresh}={})=>{pushHistory();n.color=normaliseHexColor(color,n.color);renderNodes();renderEdges();if(refresh)inspect();});
   }else if(selEdge){
     const e=edges.find(x=>x.id===selEdge);
     const a=nodes.find(n=>n.id===e.from), b=nodes.find(n=>n.id===e.to);
@@ -653,21 +779,23 @@ function inspect(){
       <label class="fld">Connection type</label>
       <select id="e-style">${Object.entries(STYLES).map(([k,v])=>`<option value="${k}" ${k===e.style?'selected':''}>${v.label}</option>`).join('')}</select>
       <label class="fld">Colour</label>
-      <div class="swatch-row">${PALETTE.map(c=>`<div class="sw ${c===e.color?'on':''}" data-c="${c}" style="background:${c}"></div>`).join('')}</div>
-      <label class="fld">Straight line position</label>
-      <div class="hint">Set Line routing to Straight, then use arrows or these buttons to move the bend.</div>
+      ${renderSwatchControls(e.color,'edge')}
+      <label class="fld">Connector path</label>
+      <div class="hint">Set Line routing to Straight. Drag the white handle points on the line to shape 90-degree bends. Double-click a handle to remove it.</div>
+      <button class="small-add" data-add-point="1">＋ Add bend point</button>
       <div class="nudge-grid">
         <span class="blank"></span><button data-dx="0" data-dy="-7">↑</button><span class="blank"></span>
         <button data-dx="-7" data-dy="0">←</button><button data-reset="1">↺</button><button data-dx="7" data-dy="0">→</button>
         <span class="blank"></span><button data-dx="0" data-dy="7">↓</button><span class="blank"></span>
       </div>`;
     document.getElementById('e-style').onchange=ev=>{pushHistory();e.style=ev.target.value;renderEdges();};
-    box.querySelectorAll('.sw').forEach(s=>s.onclick=()=>{pushHistory();e.color=s.dataset.c;renderEdges();inspect();});
+    bindSwatchControls(box,e.color,(color,{refresh}={})=>{pushHistory();e.color=normaliseHexColor(color,e.color||'#555');renderEdges();if(refresh)inspect();});
+    box.querySelector('[data-add-point]')?.addEventListener('click',()=>{pushHistory();addEdgePoint(e);renderEdges();inspect();});
     box.querySelectorAll('.nudge-grid button').forEach(btn=>btn.onclick=()=>{
       pushHistory();
-      if(btn.dataset.reset){delete e.bendX;delete e.bendY;}
+      if(btn.dataset.reset){resetEdgePoints(e);}
       else nudgeEdge(e,+btn.dataset.dx,+btn.dataset.dy);
-      renderEdges();
+      renderEdges();inspect();
     });
   }else{
     box.innerHTML='<p class="empty">Select a box or a connection to edit it.</p>';
@@ -809,8 +937,9 @@ function nudgeSelectedNodes(dx,dy){
   renderNodes();renderEdges();
 }
 function nudgeEdge(edge,dx,dy){
-  edge.bendX=(edge.bendX||0)+dx;
-  edge.bendY=(edge.bendY||0)+dy;
+  const ep=edgeEndpoints(edge);
+  if(!ep)return;
+  ensureEdgePoints(edge,ep.x1,ep.y1,ep.x2,ep.y2).forEach(p=>{p.x+=dx;p.y+=dy;});
 }
 
 // ===== export / import =====
