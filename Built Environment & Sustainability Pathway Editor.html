@@ -1333,94 +1333,78 @@ function wrapText(ctx,text,maxW){
   return lines;
 }
 
-function buildMapCanvas(){
-  let minX=Infinity, minY=Infinity, maxX=0, maxY=0;
+function exportBounds(){
+  let minX=Infinity,minY=0,maxX=0,maxY=0;
   COLS.forEach(c=>{minX=Math.min(minX,c.x);maxX=Math.max(maxX,c.x+c.w);});
   nodes.forEach(n=>{
     const el=document.querySelector(`.node[data-id="${n.id}"]`);
     const h=el?el.offsetHeight:40;
-    minX=Math.min(minX,n.x); minY=Math.min(minY,n.y);
-    maxX=Math.max(maxX,n.x+(n.w||184)); maxY=Math.max(maxY,n.y+h);
+    minX=Math.min(minX,n.x);maxX=Math.max(maxX,n.x+(n.w||184));maxY=Math.max(maxY,n.y+h);
   });
-  const PAD=40, HEADER_H=60, LEGEND_H=140;
-  const cW=maxX-minX+PAD*2, cH=maxY-minY+PAD*2+HEADER_H+LEGEND_H;
-  const DPR=2;
-  const canvas=document.createElement('canvas');
-  canvas.width=cW*DPR; canvas.height=cH*DPR;
-  const ctx=canvas.getContext('2d');
-  ctx.scale(DPR,DPR);
-  const ox=-minX+PAD, oy=-minY+PAD+HEADER_H;
-  ctx.fillStyle='#f4f6f9'; ctx.fillRect(0,0,cW,cH);
-  const badge2=document.querySelector('.badge')?.textContent||'515T';
-  const title2=document.querySelector('header h1')?.textContent||'Pathways';
-  ctx.font='bold 20px "Segoe UI",Helvetica,Arial,sans-serif';
-  ctx.fillStyle='#1d2530';
-  ctx.fillText(`${badge2}  ${title2}`,PAD,HEADER_H*0.6);
-  COLS.forEach(c=>{
-    ctx.fillStyle=hexToRgba(columnColor(c),0.55);
-    roundRect(ctx,ox+c.x,oy-PAD+minY,c.w,maxY-minY+PAD*2,10); ctx.fill();
-    ctx.font='bold 13px "Segoe UI",Helvetica,Arial,sans-serif';
-    ctx.fillStyle='#3a4654'; ctx.textAlign='center';
-    ctx.fillText(c.label,ox+c.x+c.w/2,oy-PAD+minY+22);
-    ctx.textAlign='left';
+  if(!isFinite(minX))minX=0;
+  return{minX,minY,maxX,maxY};
+}
+function exportCss(){
+  return `*{box-sizing:border-box;font-family:"Segoe UI",Arial,Helvetica,sans-serif}body{margin:0;font-family:"Segoe UI",Arial,Helvetica,sans-serif;color:#1d2530}.export-frame{position:relative;overflow:hidden;background:linear-gradient(#dfe5ec 1px,transparent 1px) 0 0/100% 28px,linear-gradient(90deg,#dfe5ec 1px,transparent 1px) 0 0/28px 100%,#f4f6f9}.export-board{position:absolute}#board{position:relative}.col{position:absolute;top:0;bottom:0;background:#d6d8dc;border-radius:10px;opacity:.55}.col-label{position:absolute;top:10px;font-size:12px;font-weight:700;color:#3a4654;width:100%;text-align:center;letter-spacing:.4px}.node{position:absolute;width:190px;min-height:40px;border-radius:6px;padding:6px 8px;color:#fff;box-shadow:0 1px 3px rgba(20,30,45,.08),0 6px 18px rgba(20,30,45,.06);font-family:"Segoe UI",Arial,Helvetica,sans-serif;font-size:10.5px;font-weight:400;line-height:1.25;user-select:none;border:2px solid transparent}.node .title{font-weight:700;display:block}.node .code{font-size:9px;opacity:.85;font-weight:600;display:block;margin-bottom:2px;letter-spacing:.3px}.node.sel,.node.link-src{border-color:transparent;box-shadow:0 1px 3px rgba(20,30,45,.08),0 6px 18px rgba(20,30,45,.06)}.node .port,.edge-hit,.edge-handle,.edge-add-handle,.ghost{display:none!important}svg#edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}.node{z-index:2}path.edge{fill:none;stroke-width:2.4;pointer-events:none}.edge.sel{stroke-width:2.4}.export-legend{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:24px;flex-wrap:wrap;padding:13px 40px;background:#fff;border-top:1px solid #dfe5ec;color:#1d2530;font-size:11.5px}.export-legend-item{display:flex;align-items:center;gap:8px;white-space:nowrap}.export-legend svg{width:40px;height:14px;overflow:visible;flex:0 0 auto}`;
+}
+function exportLegendHtml(){
+  return `<div class="export-legend">${Object.values(STYLES).map(v=>{const dash=v.dash==='none'?'':`stroke-dasharray="${v.dash}"`;return `<div class="export-legend-item"><svg height="14" viewBox="0 0 40 14"><line x1="0" y1="7" x2="40" y2="7" stroke="#333" stroke-width="${v.w}" stroke-linecap="${v.cap}" ${dash}/></svg><span>${esc(v.label)}</span></div>`;}).join('')}</div>`;
+}
+function cleanExportClone(){
+  const clone=board.cloneNode(true);
+  clone.querySelectorAll('.edge-hit,.edge-handle,.edge-add-handle,.ghost,.port').forEach(el=>el.remove());
+  clone.querySelectorAll('.sel,.link-src').forEach(el=>el.classList.remove('sel','link-src'));
+  const edgeSvg=clone.querySelector('#edges');
+  if(edgeSvg){
+    edgeSvg.setAttribute('xmlns',SVGNS);
+    edgeSvg.setAttribute('width','100%');edgeSvg.setAttribute('height','100%');
+    edgeSvg.setAttribute('style','position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;overflow:visible');
+    edgeSvg.querySelectorAll('path.edge').forEach(p=>{
+      p.setAttribute('fill','none');
+      p.setAttribute('stroke',p.getAttribute('stroke')||'#555');
+      p.setAttribute('stroke-width',p.getAttribute('stroke-width')||'2.4');
+      p.setAttribute('stroke-linecap',p.getAttribute('stroke-linecap')||'butt');
+      p.setAttribute('stroke-linejoin','round');
+      p.setAttribute('style','fill:none;vector-effect:none');
+    });
+  }
+  clone.querySelectorAll('.col').forEach(el=>el.style.zIndex='0');
+  clone.querySelectorAll('.node').forEach(el=>el.style.zIndex='2');
+  return clone;
+}
+function svgTextForExport(width,height,bodyHtml){
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml">${bodyHtml}</div></foreignObject></svg>`;
+}
+function canvasFromSvgText(svgText,width,height,DPR=2){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>{
+      const canvas=document.createElement('canvas');
+      canvas.width=width*DPR;canvas.height=height*DPR;
+      const ctx=canvas.getContext('2d');
+      ctx.scale(DPR,DPR);ctx.drawImage(img,0,0,width,height);
+      resolve({canvas,DPR});
+    };
+    img.onerror=()=>reject(new Error('Could not render export image'));
+    img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svgText);
   });
-  edges.forEach(e=>{
-    const a=nodes.find(n=>n.id===e.from), b=nodes.find(n=>n.id===e.to);
-    if(!a||!b) return;
-    const ra=nodeRect(a), rb=nodeRect(b);
-    const x1=ox+ra.x+ra.w, y1=oy+ra.y+ra.h/2, x2=ox+rb.x, y2=oy+rb.y+rb.h/2;
-    const mx=(x1+x2)/2;
-    const st=STYLES[e.style]||STYLES.guar;
-    ctx.beginPath(); ctx.strokeStyle=e.color||'#555';
-    ctx.lineWidth=st.w; ctx.lineCap=st.cap;
-    if(st.dash!=='none') ctx.setLineDash(st.dash.split(' ').map(Number));
-    else ctx.setLineDash([]);
-    ctx.moveTo(x1,y1);
-    if(lineRouting==='straight'){drawStraightRoute(ctx,x1,y1,x2,y2,e);}
-    else ctx.bezierCurveTo(mx,y1,mx,y2,x2,y2);
-    ctx.stroke();
-  });
-  ctx.setLineDash([]);
-  nodes.forEach(n=>{
-    const el=document.querySelector(`.node[data-id="${n.id}"]`);
-    const h=el?el.offsetHeight:40, w=n.w||184;
-    const nx=ox+n.x, ny=oy+n.y;
-    ctx.fillStyle=n.color; roundRect(ctx,nx,ny,w,h,6); ctx.fill();
-    ctx.fillStyle='#fff';
-    let textY=ny+13;
-    if(n.code){
-      ctx.font='600 9px "Segoe UI",Helvetica,Arial,sans-serif';
-      ctx.globalAlpha=0.85;
-      ctx.fillText(n.code,nx+7,textY);
-      ctx.globalAlpha=1;
-      textY+=12;
-    }
-    ctx.font='bold 10.5px "Segoe UI",Helvetica,Arial,sans-serif';
-    const lines=wrapText(ctx,n.title,w-14);
-    lines.forEach((ln,i)=>ctx.fillText(ln,nx+7,textY+i*12));
-  });
-  let legY2=oy+maxY+PAD+10;
-  let legX2=PAD;
-  const legMaxX=cW-PAD, legGap=24, legRowH=24;
-  ctx.font='12px "Segoe UI",Helvetica,Arial,sans-serif';
-  Object.values(STYLES).forEach(v=>{
-    const labelW=ctx.measureText(v.label).width;
-    const itemW=46+labelW;
-    if(legX2>PAD&&legX2+itemW>legMaxX){legX2=PAD;legY2+=legRowH;}
-    ctx.beginPath(); ctx.strokeStyle='#333'; ctx.lineWidth=v.w; ctx.lineCap=v.cap;
-    if(v.dash!=='none') ctx.setLineDash(v.dash.split(' ').map(Number));
-    else ctx.setLineDash([]);
-    ctx.moveTo(legX2,legY2); ctx.lineTo(legX2+40,legY2); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle='#1d2530';
-    ctx.fillText(v.label,legX2+46,legY2+4);
-    legX2+=itemW+legGap;
-  });
-  return {canvas, cW, cH, DPR};
+}
+async function buildMapCanvas(){
+  renderNodes();renderEdges();
+  const {minX,minY,maxX,maxY}=exportBounds();
+  const PAD=40,DPR=2,LEGEND_H=58;
+  const cW=Math.ceil(maxX-minX+PAD*2),cH=Math.ceil(maxY-minY+PAD*2+LEGEND_H);
+  const clone=cleanExportClone();
+  clone.classList.add('export-board');
+  clone.style.left=(PAD-minX)+'px';clone.style.top=(PAD-minY)+'px';
+  clone.style.width=board.style.width||board.offsetWidth+'px';clone.style.height=board.style.height||board.offsetHeight+'px';
+  const html=`<style>${exportCss()}</style><div class="export-frame" style="width:${cW}px;height:${cH}px">${clone.outerHTML}${exportLegendHtml()}</div>`;
+  const rendered=await canvasFromSvgText(svgTextForExport(cW,cH,html),cW,cH,DPR);
+  return{canvas:rendered.canvas,cW,cH,DPR};
 }
 
-document.getElementById('expPng').onclick=function(){
-  const {canvas}=buildMapCanvas();
+document.getElementById('expPng').onclick=async function(){
+  const {canvas}=await buildMapCanvas();
   const title2=document.querySelector('header h1')?.textContent||'pathways';
   const fname=title2.replace(/[^a-z0-9]/gi,'_').toLowerCase()+'.png';
   const a=document.createElement('a');
@@ -1428,131 +1412,27 @@ document.getElementById('expPng').onclick=function(){
   a.download=fname; a.click();
 };
 
-function buildSlideCanvas(){
-  // bounding box
-  let minX=Infinity,minY=Infinity,maxX=0,maxY=0;
-  COLS.forEach(c=>{minX=Math.min(minX,c.x);maxX=Math.max(maxX,c.x+c.w);});
-  nodes.forEach(n=>{
-    const el=document.querySelector(`.node[data-id="${n.id}"]`);
-    const h=el?el.offsetHeight:40;
-    minX=Math.min(minX,n.x);minY=Math.min(minY,n.y);
-    maxX=Math.max(maxX,n.x+(n.w||184));maxY=Math.max(maxY,n.y+h);
-  });
-
-  const SW=1920,SH=1080,DPR=2;
-  const canvas=document.createElement('canvas');
-  canvas.width=SW*DPR;canvas.height=SH*DPR;
-  const ctx=canvas.getContext('2d');
-  ctx.scale(DPR,DPR);
-
-  // background
-  ctx.fillStyle='#f4f6f9';ctx.fillRect(0,0,SW,SH);
-
-  // header bar
-  const HDRH=48,PAD=28;
-  ctx.fillStyle='#ffffff';ctx.fillRect(0,0,SW,HDRH);
-  ctx.strokeStyle='#dfe5ec';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(0,HDRH);ctx.lineTo(SW,HDRH);ctx.stroke();
-  const badge2=document.querySelector('.badge')?.textContent||'';
-  const title2=document.querySelector('header h1')?.textContent||'Pathways';
-  // badge pill
-  if(badge2){
-    ctx.font='bold 11px "Segoe UI",Helvetica,Arial,sans-serif';
-    const bw=ctx.measureText(badge2).width+14;
-    ctx.fillStyle='#d4543a';roundRect(ctx,PAD,14,bw,20,10);ctx.fill();
-    ctx.fillStyle='#fff';ctx.fillText(badge2,PAD+7,28);
-    ctx.font='bold 18px "Segoe UI",Helvetica,Arial,sans-serif';
-    ctx.fillStyle='#1d2530';ctx.fillText(title2,PAD+bw+10,30);
-  } else {
-    ctx.font='bold 18px "Segoe UI",Helvetica,Arial,sans-serif';
-    ctx.fillStyle='#1d2530';ctx.fillText(title2,PAD,30);
-  }
-
-  // legend strip at bottom
-  const LEGH=28;
-  ctx.fillStyle='#ffffff';ctx.fillRect(0,SH-LEGH,SW,LEGH);
-  ctx.strokeStyle='#dfe5ec';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(0,SH-LEGH);ctx.lineTo(SW,SH-LEGH);ctx.stroke();
-  let legX=PAD;const legY=SH-LEGH/2+1;
-  ctx.font='10.5px "Segoe UI",Helvetica,Arial,sans-serif';
-  Object.values(STYLES).forEach(v=>{
-    ctx.beginPath();ctx.strokeStyle='#444';ctx.lineWidth=v.w;ctx.lineCap=v.cap;
-    if(v.dash!=='none')ctx.setLineDash(v.dash.split(' ').map(Number));
-    else ctx.setLineDash([]);
-    ctx.moveTo(legX,legY);ctx.lineTo(legX+30,legY);ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle='#4a5568';ctx.lineWidth=1;
-    ctx.fillText(v.label,legX+34,legY+4);
-    legX+=34+ctx.measureText(v.label).width+20;
-  });
-
-  // content area: fit map into the space between header and legend
-  const availW=SW-PAD*2;
-  const availH=SH-HDRH-LEGH-PAD;
-  const contentW=maxX-minX;
-  const contentH=maxY-minY;
-  const scale=Math.min(availW/contentW, availH/contentH);
+async function buildSlideCanvas(){
+  renderNodes();renderEdges();
+  const {minX,minY,maxX,maxY}=exportBounds();
+  const SW=1920,SH=1080,DPR=2,PAD=28,LEGEND_H=42;
+  const contentW=maxX-minX,contentH=maxY-minY;
+  const scale=Math.min((SW-PAD*2)/contentW,(SH-PAD*2-LEGEND_H)/contentH);
   const drawW=contentW*scale,drawH=contentH*scale;
-  const tx=PAD+(availW-drawW)/2 - minX*scale;
-  const ty=HDRH+PAD/2+(availH-drawH)/2 - minY*scale;
-
-  ctx.save();
-  ctx.translate(tx,ty);
-  ctx.scale(scale,scale);
-
-  // column backgrounds + labels
-  COLS.forEach(c=>{
-    ctx.fillStyle=hexToRgba(columnColor(c),0.6);
-    roundRect(ctx,c.x,minY,c.w,maxY-minY,10);ctx.fill();
-    ctx.font='bold 13px "Segoe UI",Helvetica,Arial,sans-serif';
-    ctx.fillStyle='#3a4654';ctx.textAlign='center';
-    ctx.fillText(c.label,c.x+c.w/2,minY-6);
-    ctx.textAlign='left';
-  });
-
-  // edges
-  edges.forEach(e=>{
-    const a=nodes.find(n=>n.id===e.from),b=nodes.find(n=>n.id===e.to);
-    if(!a||!b)return;
-    const ra=nodeRect(a),rb=nodeRect(b);
-    const x1=ra.x+ra.w,y1=ra.y+ra.h/2,x2=rb.x,y2=rb.y+rb.h/2,mx=(x1+x2)/2;
-    const st=STYLES[e.style]||STYLES.guar;
-    ctx.beginPath();ctx.strokeStyle=e.color||'#555';
-    ctx.lineWidth=st.w;ctx.lineCap=st.cap;
-    if(st.dash!=='none')ctx.setLineDash(st.dash.split(' ').map(Number));
-    else ctx.setLineDash([]);
-    ctx.moveTo(x1,y1);
-    if(lineRouting==='straight'){drawStraightRoute(ctx,x1,y1,x2,y2,e);}
-    else ctx.bezierCurveTo(mx,y1,mx,y2,x2,y2);
-    ctx.stroke();
-  });
-  ctx.setLineDash([]);
-
-  // nodes
-  nodes.forEach(n=>{
-    const el=document.querySelector(`.node[data-id="${n.id}"]`);
-    const h=el?el.offsetHeight:40,w=n.w||184;
-    ctx.fillStyle=n.color;roundRect(ctx,n.x,n.y,w,h,6);ctx.fill();
-    ctx.fillStyle='#fff';
-    let textY=n.y+13;
-    if(n.code){
-      ctx.font='600 9px "Segoe UI",Helvetica,Arial,sans-serif';
-      ctx.globalAlpha=0.85;
-      ctx.fillText(n.code,n.x+7,textY);
-      ctx.globalAlpha=1;
-      textY+=12;
-    }
-    ctx.font='bold 10.5px "Segoe UI",Helvetica,Arial,sans-serif';
-    const lines=wrapText(ctx,n.title,w-14);
-    lines.forEach((ln,i)=>ctx.fillText(ln,n.x+7,textY+i*12));
-  });
-
-  ctx.restore();
-  return canvas;
+  const tx=PAD+(SW-PAD*2-drawW)/2-minX*scale;
+  const ty=PAD+(SH-PAD*2-LEGEND_H-drawH)/2-minY*scale;
+  const clone=cleanExportClone();
+  clone.classList.add('export-board');
+  clone.style.left=tx+'px';clone.style.top=ty+'px';
+  clone.style.width=board.style.width||board.offsetWidth+'px';clone.style.height=board.style.height||board.offsetHeight+'px';
+  clone.style.transform=`scale(${scale})`;clone.style.transformOrigin='0 0';
+  const html=`<style>${exportCss()}</style><div class="export-frame" style="width:${SW}px;height:${SH}px">${clone.outerHTML}${exportLegendHtml()}</div>`;
+  const rendered=await canvasFromSvgText(svgTextForExport(SW,SH,html),SW,SH,DPR);
+  return rendered.canvas;
 }
 
-document.getElementById('expSlide').onclick=function(){
-  const canvas=buildSlideCanvas();
+document.getElementById('expSlide').onclick=async function(){
+  const canvas=await buildSlideCanvas();
   const title2=document.querySelector('header h1')?.textContent||'pathways';
   const fname=title2.replace(/[^a-z0-9]/gi,'_').toLowerCase()+'_slide.png';
   const a=document.createElement('a');
@@ -1560,8 +1440,8 @@ document.getElementById('expSlide').onclick=function(){
   a.download=fname;a.click();
 };
 
-document.getElementById('expPdf').onclick=function(){
-  const {canvas, cW, cH, DPR}=buildMapCanvas();
+document.getElementById('expPdf').onclick=async function(){
+  const {canvas, cW, cH, DPR}=await buildMapCanvas();
 
   // ---- Build PDF with JPEG image ----
   const jpegUrl=canvas.toDataURL('image/jpeg',0.95);
