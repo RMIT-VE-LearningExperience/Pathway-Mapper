@@ -1419,7 +1419,7 @@ async function buildSlideCanvas(){
   const contentW=maxX-minX,contentH=maxY-minY;
   const scale=Math.min((SW-PAD*2)/contentW,(SH-PAD*2-LEGEND_H)/contentH);
   const drawW=contentW*scale,drawH=contentH*scale;
-  const tx=PAD+(SW-PAD*2-drawW)/2-minX*scale;
+  const tx=PAD-minX*scale;
   const ty=PAD+(SH-PAD*2-LEGEND_H-drawH)/2-minY*scale;
   const clone=cleanExportClone();
   clone.classList.add('export-board');
