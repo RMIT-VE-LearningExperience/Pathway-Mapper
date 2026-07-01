@@ -245,6 +245,8 @@
       <option value="straight" selected>Straight</option>
       <option value="curved">Curved</option>
     </select>
+    <label class="fld">Background colour</label>
+    <input class="col-color-input" type="color" id="bgColor" value="#ffffff" aria-label="Background colour">
 
     <h2>Columns</h2>
     <div id="colEditor"></div>
@@ -400,12 +402,19 @@ let selNode=null, selEdge=null;
 let selNodes=new Set();
 let linkMode=false, linkFrom=null;
 let lineRouting='straight';
+let mapBackgroundColor='#ffffff';
 
 function normaliseHexColor(value,fallback=DEFAULT_COL_COLOR){
   const raw=String(value||'').trim();
   return /^#[0-9a-f]{6}$/i.test(raw)?raw:fallback;
 }
 function columnColor(c){return normaliseHexColor(c?.color);}
+function setMapBackgroundColor(color){
+  mapBackgroundColor=normaliseHexColor(color,'#ffffff');
+  document.documentElement.style.setProperty('--bg',mapBackgroundColor);
+  const input=document.getElementById('bgColor');
+  if(input)input.value=mapBackgroundColor;
+}
 function hexToRgba(hex,alpha){
   const rgb=hexToRgb(normaliseHexColor(hex));
   return `rgba(${rgb.r},${rgb.g},${rgb.b},${alpha})`;
@@ -910,7 +919,7 @@ async function createNewMap(){
   if(title===null)return;
   const name=title.trim()||'Future Technologies — New Pathway Map';
   const blankCols=COLS.map(c=>({...cloneState(c),color:DEFAULT_COL_COLOR}));
-  const blankData={cols:blankCols,styles:cloneState(STYLES),nodes:[],edges:[],lineRouting:'straight'};
+  const blankData={cols:blankCols,styles:cloneState(STYLES),nodes:[],edges:[],lineRouting:'straight',backgroundColor:mapBackgroundColor};
   const body={editor:EDITOR_ID,name,title:name,badge:(document.querySelector('header .badge')?.textContent||'').trim(),data:blankData};
   const res=await fetch(`${VIEW_API}/views`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
   const saved=await res.json();
@@ -975,7 +984,7 @@ function download(name,content,type){
   const a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u);
 }
 document.getElementById('expJson').onclick=()=>{
-  download('ci_pathways.json',JSON.stringify({cols:COLS,styles:STYLES,nodes,edges,lineRouting},null,2),'application/json');
+  download('ci_pathways.json',JSON.stringify(currentViewData(),null,2),'application/json');
 };
 document.getElementById('impBtn').onclick=()=>document.getElementById('fileIn').click();
 document.getElementById('fileIn').onchange=e=>{
@@ -985,6 +994,7 @@ document.getElementById('fileIn').onchange=e=>{
     if(Array.isArray(d.cols))applyViewData(d);
     else{nodes=d.nodes||[];edges=d.edges||[];
       if(d.lineRouting){lineRouting=d.lineRouting;document.getElementById('lineRouting').value=lineRouting;}
+      setMapBackgroundColor(d.backgroundColor||'#ffffff');
       syncCounters();clearSel();renderNodes();renderEdges();}
   }catch(err){alert('Invalid JSON');}};r.readAsText(f);
 };
@@ -994,7 +1004,7 @@ const VIEW_API='https://pathway-editor-views.lawrence-makoona.workers.dev';
 const EDITOR_ID='ft';
 const AI_CONTACT_MESSAGE='VAL AI Assist is currently unavailable. Please contact dmd.cove@rmit.edu.au to reactivate the API capabilities.';
 let undoStack=[], redoStack=[], restoringHistory=false;
-function currentViewData(){return{cols:COLS,styles:STYLES,nodes,edges,lineRouting};}
+function currentViewData(){return{cols:COLS,styles:STYLES,nodes,edges,lineRouting,backgroundColor:mapBackgroundColor};}
 function cloneState(value){return JSON.parse(JSON.stringify(value));}
 function editorSnapshot(){
   return{
@@ -1047,6 +1057,7 @@ function applyViewData(d){
   nodes=d.nodes||[];edges=d.edges||[];
   recalcColPositions();
   if(d.lineRouting){lineRouting=d.lineRouting;document.getElementById('lineRouting').value=lineRouting;}
+  setMapBackgroundColor(d.backgroundColor||'#ffffff');
   syncCounters();clearSel();rebuildCols();renderNodes();renderEdges();renderLegend();inspect();renderColEditor();
 }
 function currentViewName(){return(document.querySelector('header h1')?.textContent||'Future Technologies view').trim();}
@@ -1299,7 +1310,7 @@ function exportHTML(){
   let legend=Object.values(STYLES).map(v=>{const dash=v.dash==='none'?'':`stroke-dasharray="${v.dash}"`;
     return `<div style="display:flex;align-items:center;gap:8px;margin:6px 0;font:12px Segoe UI,sans-serif"><svg width="44" height="12"><line x1="0" y1="6" x2="44" y2="6" stroke="#333" stroke-width="${v.w}" stroke-linecap="${v.cap}" ${dash}/></svg><span>${v.label}</span></div>`;}).join('');
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Future Technologies Pathways</title></head>
-  <body style="margin:0;background:#f4f6f9"><div style="padding:14px 20px;font:700 16px Segoe UI,sans-serif">Future Technologies — Pathways (525T)</div>
+  <body style="margin:0;background:${mapBackgroundColor}"><div style="padding:14px 20px;font:700 16px Segoe UI,sans-serif">Future Technologies — Pathways (525T)</div>
   <div style="overflow:auto"><div style="position:relative;width:${w}px;height:${h}px">
   ${cols}<svg style="position:absolute;inset:0;width:100%;height:100%">${svgEdges}</svg>${nodeHtml}</div></div>
   <div style="padding:16px 20px">${legend}</div></body></html>`;
@@ -1348,7 +1359,8 @@ function exportBounds(){
   return{minX,minY,maxX,maxY};
 }
 function exportCss(){
-  return `*{box-sizing:border-box;font-family:"Segoe UI",Arial,Helvetica,sans-serif}body{margin:0;font-family:"Segoe UI",Arial,Helvetica,sans-serif;color:#1d2530}.export-frame{position:relative;overflow:hidden;background:linear-gradient(#dfe5ec 1px,transparent 1px) 0 0/100% 28px,linear-gradient(90deg,#dfe5ec 1px,transparent 1px) 0 0/28px 100%,#f4f6f9}.export-board{position:absolute}#board{position:relative}.col{position:absolute;top:0;bottom:0;background:#d6d8dc;border-radius:10px;opacity:.55}.col-label{position:absolute;top:10px;font-size:12px;font-weight:700;color:#3a4654;width:100%;text-align:center;letter-spacing:.4px}.node{position:absolute;width:190px;min-height:40px;border-radius:6px;padding:6px 8px;color:#fff;box-shadow:0 1px 3px rgba(20,30,45,.08),0 6px 18px rgba(20,30,45,.06);font-family:"Segoe UI",Arial,Helvetica,sans-serif;font-size:10.5px;font-weight:400;line-height:1.25;user-select:none;border:2px solid transparent}.node .title{font-weight:700;display:block}.node .code{font-size:9px;opacity:.85;font-weight:600;display:block;margin-bottom:2px;letter-spacing:.3px}.node.sel,.node.link-src{border-color:transparent;box-shadow:0 1px 3px rgba(20,30,45,.08),0 6px 18px rgba(20,30,45,.06)}.node .port,.edge-hit,.edge-handle,.edge-add-handle,.ghost{display:none!important}svg#edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}.node{z-index:2}path.edge{fill:none;stroke-width:2.4;pointer-events:none}.edge.sel{stroke-width:2.4}.export-legend{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:24px;flex-wrap:wrap;padding:13px 40px;background:#fff;border-top:1px solid #dfe5ec;color:#1d2530;font-size:11.5px}.export-legend-item{display:flex;align-items:center;gap:8px;white-space:nowrap}.export-legend svg{width:40px;height:14px;overflow:visible;flex:0 0 auto}`;
+  const bg=mapBackgroundColor;
+  return `*{box-sizing:border-box;font-family:"Segoe UI",Arial,Helvetica,sans-serif}body{margin:0;font-family:"Segoe UI",Arial,Helvetica,sans-serif;color:#1d2530}.export-frame{position:relative;overflow:hidden;background:linear-gradient(#dfe5ec 1px,transparent 1px) 0 0/100% 28px,linear-gradient(90deg,#dfe5ec 1px,transparent 1px) 0 0/28px 100%,${bg}.export-board{position:absolute}#board{position:relative}.col{position:absolute;top:0;bottom:0;background:#d6d8dc;border-radius:10px;opacity:.55}.col-label{position:absolute;top:10px;font-size:12px;font-weight:700;color:#3a4654;width:100%;text-align:center;letter-spacing:.4px}.node{position:absolute;width:190px;min-height:40px;border-radius:6px;padding:6px 8px;color:#fff;box-shadow:0 1px 3px rgba(20,30,45,.08),0 6px 18px rgba(20,30,45,.06);font-family:"Segoe UI",Arial,Helvetica,sans-serif;font-size:10.5px;font-weight:400;line-height:1.25;user-select:none;border:2px solid transparent}.node .title{font-weight:700;display:block}.node .code{font-size:9px;opacity:.85;font-weight:600;display:block;margin-bottom:2px;letter-spacing:.3px}.node.sel,.node.link-src{border-color:transparent;box-shadow:0 1px 3px rgba(20,30,45,.08),0 6px 18px rgba(20,30,45,.06)}.node .port,.edge-hit,.edge-handle,.edge-add-handle,.ghost{display:none!important}svg#edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}.node{z-index:2}path.edge{fill:none;stroke-width:2.4;pointer-events:none}.edge.sel{stroke-width:2.4}.export-legend{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:24px;flex-wrap:wrap;padding:13px 40px;background:#fff;border-top:1px solid #dfe5ec;color:#1d2530;font-size:11.5px}.export-legend-item{display:flex;align-items:center;gap:8px;white-space:nowrap}.export-legend svg{width:40px;height:14px;overflow:visible;flex:0 0 auto}`;
 }
 function exportLegendHtml(){
   return `<div class="export-legend">${Object.values(STYLES).map(v=>{const dash=v.dash==='none'?'':`stroke-dasharray="${v.dash}"`;return `<div class="export-legend-item"><svg height="14" viewBox="0 0 40 14"><line x1="0" y1="7" x2="40" y2="7" stroke="#333" stroke-width="${v.w}" stroke-linecap="${v.cap}" ${dash}/></svg><span>${esc(v.label)}</span></div>`;}).join('')}</div>`;
@@ -1385,7 +1397,7 @@ function canvasFromSvgText(svgText,width,height,DPR=2){
       const canvas=document.createElement('canvas');
       canvas.width=width*DPR;canvas.height=height*DPR;
       const ctx=canvas.getContext('2d');
-      ctx.scale(DPR,DPR);ctx.drawImage(img,0,0,width,height);
+      ctx.scale(DPR,DPR);ctx.fillStyle=mapBackgroundColor;ctx.fillRect(0,0,width,height);ctx.drawImage(img,0,0,width,height);
       resolve({canvas,DPR});
     };
     img.onerror=()=>reject(new Error('Could not render export image'));
@@ -1514,6 +1526,7 @@ document.getElementById('expPdf').onclick=async function(){
 
 // ===== options =====
 document.getElementById('lineRouting').onchange=e=>{pushHistory();lineRouting=e.target.value;renderEdges();};
+document.getElementById('bgColor').oninput=e=>{pushHistory();setMapBackgroundColor(e.target.value);};
 
 // ===== column editor =====
 function renderColEditor(){
@@ -1598,7 +1611,7 @@ function rebuildCols(){
 }
 
 // ===== boot =====
-seed();rebuildCols();renderNodes();renderEdges();renderLegend();inspect();renderColEditor();updateHistoryButtons();
+setMapBackgroundColor(mapBackgroundColor);seed();rebuildCols();renderNodes();renderEdges();renderLegend();inspect();renderColEditor();updateHistoryButtons();
 loadInitialCloudView().catch(err=>setAiStatus(`Could not load saved view: ${err.message}`,true));
 refreshMapSwitcherViews().catch(()=>{});
 </script>
